@@ -1,8 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
-import { Observable, of } from 'rxjs';
-import { switchMap, catchError } from 'rxjs/operators';
+import { Observable, of, Subscription } from 'rxjs';
+import { switchMap, catchError, finalize } from 'rxjs/operators';
 
 import { Personne } from '../../../core/models/personne.model';
 import { PersonneService } from '../../../core/services/personne.service';
@@ -12,7 +12,7 @@ import { PersonneService } from '../../../core/services/personne.service';
   templateUrl: './person-details.component.html',
   styleUrls: ['./person-details.component.scss']
 })
-export class PersonDetailsComponent implements OnInit {
+export class PersonDetailsComponent implements OnInit, OnDestroy {
   personne$: Observable<Personne> = of();
   pere$: Observable<Personne | null> = of(null);
   mere$: Observable<Personne | null> = of(null);
@@ -21,6 +21,9 @@ export class PersonDetailsComponent implements OnInit {
 
   // Propriété pour stocker la personne actuelle
   currentPersonne: Personne | null = null;
+
+  // Tableau pour stocker les souscriptions
+  private subscriptions: Subscription[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -33,47 +36,56 @@ export class PersonDetailsComponent implements OnInit {
     this.loadPersonne();
   }
 
+  ngOnDestroy(): void {
+    // Se désabonner de toutes les souscriptions pour éviter les fuites de mémoire
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.subscriptions = [];
+  }
+
   loadPersonne(): void {
     this.isLoading = true;
     this.error = null;
 
+    // Créer l'observable pour charger la personne
     this.personne$ = this.route.paramMap.pipe(
       switchMap(params => {
         const personneId = params.get('id');
         if (!personneId) {
           throw new Error('ID de personne non spécifié');
         }
-        return this.personneService.getPersonneById(personneId);
+        return this.personneService.getPersonneById(personneId).pipe(
+          finalize(() => {
+            this.isLoading = false;
+          })
+        );
       })
     );
 
-    // Charger les informations sur le père et la mère si disponibles
-    this.personne$.subscribe({
-      next: (personne) => {
-        this.isLoading = false;
-        // Stocker la personne pour l'utiliser dans les actions
-        this.currentPersonne = personne;
+    // S'abonner à l'observable pour charger les informations sur le père et la mère
+    this.subscriptions.push(
+      this.personne$.subscribe({
+        next: (personne) => {
+          // Stocker la personne pour l'utiliser dans les actions
+          this.currentPersonne = personne;
 
-        if (personne.ninaPere) {
-          this.pere$ = this.personneService.getPersonneByNina(personne.ninaPere).pipe(
-            switchMap(pere => of(pere)),
-            // Ignorer les erreurs, simplement retourner null si le père n'est pas trouvé
-            catchError(() => of(null))
-          );
-        }
+          if (personne.ninaPere) {
+            this.pere$ = this.personneService.getPersonneByNina(personne.ninaPere).pipe(
+              catchError(() => of(null))
+            );
+          }
 
-        if (personne.ninaMere) {
-          this.mere$ = this.personneService.getPersonneByNina(personne.ninaMere).pipe(
-            switchMap(mere => of(mere)),
-            catchError(() => of(null))
-          );
+          if (personne.ninaMere) {
+            this.mere$ = this.personneService.getPersonneByNina(personne.ninaMere).pipe(
+              catchError(() => of(null))
+            );
+          }
+        },
+        error: (err) => {
+          this.error = `Erreur lors du chargement des détails: ${err.message}`;
+          console.error('Erreur lors du chargement des détails:', err);
         }
-      },
-      error: (err) => {
-        this.error = `Erreur lors du chargement des détails: ${err.message}`;
-        this.isLoading = false;
-      }
-    });
+      })
+    );
   }
 
   onEdit(personne: Personne): void {
@@ -82,10 +94,10 @@ export class PersonDetailsComponent implements OnInit {
 
   /**
    * Navigue vers la vue de l'arbre de la personne
-   * AMÉLIORATION: Vérification que l'ID est bien défini avant la navigation
    */
   onViewArbre(personne: Personne): void {
     if (personne && personne.id) {
+      // Navigation vers la route /arbre/:id avec l'ID de la personne
       this.router.navigate(['/arbre', personne.id]);
     } else {
       this.error = "Impossible d'afficher l'arbre: information d'identification manquante";

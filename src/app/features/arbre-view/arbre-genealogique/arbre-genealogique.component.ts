@@ -1,6 +1,7 @@
-import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, of } from 'rxjs';
+import { delay, finalize } from 'rxjs/operators';
 import * as d3 from 'd3';
 
 import { Personne } from '../../../core/models/personne.model';
@@ -42,9 +43,10 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   isLoading = false;
   error: string | null = null;
 
-  // Nouvelle propriété pour la recherche par NINA
+  // Propriété pour la recherche par NINA
   searchNina: string = '';
   isNinaValid: boolean = false;
+  isDirty: boolean = false; // Indique si l'arbre a été modifié et nécessite un rendu
 
   private subscriptions: Subscription[] = [];
   private svg: any;
@@ -55,14 +57,18 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     private route: ActivatedRoute,
     private router: Router,
     private arbreService: ArbreGenealogiqueService,
-    private personneService: PersonneService
+    private personneService: PersonneService,
+    private changeDetectorRef: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
+    // Écouter les changements de paramètres de route
     this.subscriptions.push(
       this.route.paramMap.subscribe(params => {
         const personneId = params.get('id');
         if (personneId) {
+          // Nettoyer l'état actuel avant de charger un nouvel arbre
+          this.clearCurrentTree();
           this.loadArbre(personneId);
         }
       })
@@ -74,7 +80,9 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   }
 
   ngOnDestroy(): void {
+    // Se désabonner de toutes les souscriptions pour éviter les fuites de mémoire
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.subscriptions = [];
   }
 
   /**
@@ -91,6 +99,11 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
 
     // Vérifier la validité
     this.isNinaValid = this.searchNina.length === 15;
+
+    // Réinitialiser l'erreur si l'utilisateur modifie le NINA
+    if (this.error && this.searchNina.length > 0) {
+      this.error = null;
+    }
   }
 
   /**
@@ -105,34 +118,45 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     this.isLoading = true;
     this.error = null;
 
-    this.personneService.getPersonneByNina(this.searchNina).subscribe({
-      next: (personne) => {
-        if (personne && personne.id) {
-          // Réinitialiser les paramètres avant de charger le nouvel arbre
-          this.clearCurrentTree();
-          
-          // Charger l'arbre de la personne trouvée
-          this.loadArbre(personne.id);
-        } else {
-          this.isLoading = false;
-          this.error = `Aucune personne trouvée avec le NINA ${this.searchNina}`;
-        }
-      },
-      error: (err) => {
-        this.isLoading = false;
-        this.error = `Aucune personne trouvée avec le NINA ${this.searchNina}`;
-      }
-    });
+    // Réinitialiser l'état avant de rechercher
+    this.clearCurrentTree();
+
+    // Rechercher la personne par NINA
+    this.subscriptions.push(
+      this.personneService.getPersonneByNina(this.searchNina)
+        .pipe(
+          finalize(() => {
+            this.isLoading = false;
+            this.changeDetectorRef.detectChanges();
+          })
+        )
+        .subscribe({
+          next: (personne) => {
+            if (personne && personne.id) {
+              // Charger directement l'arbre de la personne trouvée
+              this.loadArbre(personne.id);
+            } else {
+              this.error = `Aucune personne trouvée avec le NINA ${this.searchNina}`;
+            }
+          },
+          error: (err) => {
+            this.error = `Aucune personne trouvée avec le NINA ${this.searchNina}`;
+            console.error('Erreur lors de la recherche par NINA:', err);
+          }
+        })
+    );
   }
 
   /**
-   * Réinitialise l'affichage de l'arbre courant
+   * Réinitialise complètement l'affichage de l'arbre courant
    */
   private clearCurrentTree(): void {
     this.arbre = null;
     this.treeData = null;
     this.selectedPerson = null;
-    
+    this.error = null;
+    this.isDirty = true;
+
     // Nettoyer le contenu SVG si présent
     if (this.svg) {
       this.svg.select('g.tree-content').selectAll('*').remove();
@@ -150,27 +174,37 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
 
     this.isLoading = true;
     this.error = null;
+    this.isDirty = true;
 
     this.subscriptions.push(
-      this.arbreService.getArbreGenealogique(personneId).subscribe({
-        next: (arbre) => {
-          this.arbre = arbre;
-          this.treeData = this.arbreService.transformToTreeData(arbre);
-          this.selectedPerson = arbre.personneprincipale;
-          this.isLoading = false;
+      this.arbreService.getArbreGenealogique(personneId)
+        .pipe(
+          finalize(() => {
+            this.isLoading = false;
+            this.changeDetectorRef.detectChanges();
+          })
+        )
+        .subscribe({
+          next: (arbre) => {
+            this.arbre = arbre;
+            this.treeData = this.arbreService.transformToTreeData(arbre);
+            this.selectedPerson = arbre.personneprincipale;
 
-          // Redessiner l'arbre après le chargement des données
-          setTimeout(() => {
-            this.renderTree();
-            // Ajuster le zoom pour voir tout l'arbre
-            this.applyInitialZoom();
-          }, 100);
-        },
-        error: (err) => {
-          this.error = `Erreur lors du chargement de l'arbre: ${err.message}`;
-          this.isLoading = false;
-        }
-      })
+            // Utiliser un délai court pour s'assurer que le DOM est prêt
+            of(null).pipe(delay(50)).subscribe(() => {
+              // Redessiner l'arbre après le chargement des données
+              this.renderTree();
+              // Ajuster le zoom pour voir tout l'arbre
+              of(null).pipe(delay(50)).subscribe(() => {
+                this.applyInitialZoom();
+              });
+            });
+          },
+          error: (err) => {
+            this.error = `Erreur lors du chargement de l'arbre: ${err.message}`;
+            console.error('Erreur lors du chargement de l\'arbre:', err);
+          }
+        })
     );
   }
 
@@ -192,8 +226,18 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   }
 
   switchViewMode(mode: 'generational' | 'hierarchical'): void {
-    this.viewMode = mode;
-    this.renderTree();
+    if (this.viewMode !== mode) {
+      this.viewMode = mode;
+      this.isDirty = true;
+      // Redessiner l'arbre uniquement si nous avons des données
+      if (this.treeData) {
+        this.renderTree();
+        // Ajuster le zoom après le rendu
+        of(null).pipe(delay(50)).subscribe(() => {
+          this.applyInitialZoom();
+        });
+      }
+    }
   }
 
   /**
@@ -277,7 +321,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       });
 
     // Si des données sont déjà disponibles, rendre l'arbre
-    if (this.treeData) {
+    if (this.treeData && this.isDirty) {
       this.renderTree();
     }
   }
@@ -314,6 +358,9 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     this.svg.transition()
       .duration(750)
       .call(this.zoom.transform, transform);
+
+    // Marquer l'arbre comme propre (pas besoin de rendu)
+    this.isDirty = false;
   }
 
   /**
@@ -337,15 +384,17 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       this.svg.classed('tree-branches', false);
     }
 
-    // Dessiner l'arbre selon le mode d'affichage sélectionné
-    if (this.viewMode === 'hierarchical') {
-      this.renderHierarchicalTree(width, height);
-    } else {
-      this.renderGenerationalTree(width, height);
+    try {
+      // Dessiner l'arbre selon le mode d'affichage sélectionné
+      if (this.viewMode === 'hierarchical') {
+        this.renderHierarchicalTree(width, height);
+      } else {
+        this.renderGenerationalTree(width, height);
+      }
+    } catch (err) {
+      console.error('Erreur lors du rendu de l\'arbre:', err);
+      this.error = 'Erreur lors du rendu de l\'arbre. Veuillez réessayer.';
     }
-
-    // Ajuster automatiquement le zoom pour voir tout l'arbre
-    setTimeout(() => this.applyInitialZoom(), 100);
   }
 
   private renderHierarchicalTree(width: number, height: number): void {
@@ -466,9 +515,9 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   }
 
   /**
- * Cette fonction modifiée améliore le rendu de l'arbre par génération
- * en assurant une meilleure séparation des branches et en évitant les croisements
- */
+   * Cette fonction modifiée améliore le rendu de l'arbre par génération
+   * en assurant une meilleure séparation des branches et en évitant les croisements
+   */
   private renderGenerationalTree(width: number, height: number): void {
     if (!this.treeData) return;
 
@@ -614,7 +663,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
             if (classes.includes('paternal-link') || classes.includes('maternal-link')) {
               return 2.5;
             }
-            return classes.includes('principal') ? 3 : 2;
+            return classes.includes('principal-link') ? 3 : 2;
           });
       });
 

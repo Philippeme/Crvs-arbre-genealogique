@@ -28,8 +28,8 @@ export class TreeLayoutUtils {
             nodesByGeneration.get(node.generation)?.push(node);
         });
 
-        // Trouver la personne principale (génération 0)
-        const principal = treeData.nodes.find(node => node.generation === 0);
+        // Trouver la personne principale (par relation = 'principal')
+        const principal = treeData.nodes.find(node => node.relation === 'principal');
         if (!principal) {
             throw new Error('Personne principale non trouvée dans les données de l\'arbre');
         }
@@ -43,7 +43,7 @@ export class TreeLayoutUtils {
             if (sourceNode && targetNode) {
                 // Dans un arbre généalogique, le lien va généralement du parent vers l'enfant
                 // Pour un affichage ascendant, nous voulons que l'enfant ait des références à ses parents
-                if (targetNode.generation < sourceNode.generation) {
+                if (targetNode.id === principal.id || targetNode.generation < sourceNode.generation) {
                     // Ici targetNode est l'enfant et sourceNode est le parent
                     if (!targetNode.children) targetNode.children = [];
                     targetNode.children.push(sourceNode);
@@ -86,6 +86,13 @@ export class TreeLayoutUtils {
         // Carte des relations parent-enfant pour tracer correctement les liens
         const childToParents = new Map<string, { father?: string, mother?: string }>();
 
+        // Trouver la personne principale (par relation = 'principal')
+        const principal = treeData.nodes.find(node => node.relation === 'principal');
+        if (!principal) {
+            console.error('Personne principale non trouvée dans les données de l\'arbre');
+            return { nodes: [], links: [] };
+        }
+
         // Remplir les maps
         treeData.nodes.forEach(node => {
             // Ajouter le nœud à la map par ID
@@ -104,8 +111,11 @@ export class TreeLayoutUtils {
             const targetNode = nodesMap.get(link.target);
 
             if (sourceNode && targetNode) {
-                // Si la source a une génération plus élevée que la cible, c'est un parent
-                if (sourceNode.generation > targetNode.generation) {
+                // Si la source et la cible ont une relation parent-enfant
+                if (sourceNode.generation > targetNode.generation ||
+                    (targetNode.id === principal.id &&
+                        (sourceNode.relation.includes('pere') || sourceNode.relation.includes('mere')))) {
+
                     if (!childToParents.has(targetNode.id)) {
                         childToParents.set(targetNode.id, {});
                     }
@@ -148,24 +158,31 @@ export class TreeLayoutUtils {
         // Résultats pour les nœuds positionnés
         const positionedNodes: PositionedTreeNode[] = [];
 
-        // Commencer par placer la personne principale (génération 0)
-        const principal = treeData.nodes.find(n => n.generation === 0);
+        // Placer la personne principale au centre
         if (principal) {
-            const y = verticalPositions.get(0) || height * 0.9;
+            const y = verticalPositions.get(principal.generation) || height * 0.9;
             nodePositions.set(principal.id, { x: centerX, y });
 
-            // Placer les nœuds de la génération 1 (parents)
-            const parents = nodesByGeneration.get(1) || [];
-            const fatherNodes = parents.filter(n => n.genre === 'M' || n.relation.includes('pere'));
-            const motherNodes = parents.filter(n => n.genre === 'F' || n.relation.includes('mere'));
+            // Identifier les parents et les placer de manière appropriée
+            const parentGen = principal.generation + 1;
+            const parents = nodesByGeneration.get(parentGen) || [];
 
-            const gen1Y = verticalPositions.get(1) || height * 0.6;
+            // Filtrer les pères et mères en fonction des relations et ninaPere/ninaMere
+            const fatherNodes = parents.filter(n =>
+                n.genre === 'M' || n.relation.includes('pere')
+            );
+
+            const motherNodes = parents.filter(n =>
+                n.genre === 'F' || n.relation.includes('mere')
+            );
+
+            const parentY = verticalPositions.get(parentGen) || height * 0.6;
 
             // Placer le père à gauche
             if (fatherNodes.length > 0) {
                 const fatherX = centerX - width * 0.15;
                 fatherNodes.forEach(father => {
-                    nodePositions.set(father.id, { x: fatherX, y: gen1Y });
+                    nodePositions.set(father.id, { x: fatherX, y: parentY });
                 });
             }
 
@@ -173,20 +190,19 @@ export class TreeLayoutUtils {
             if (motherNodes.length > 0) {
                 const motherX = centerX + width * 0.15;
                 motherNodes.forEach(mother => {
-                    nodePositions.set(mother.id, { x: motherX, y: gen1Y });
+                    nodePositions.set(mother.id, { x: motherX, y: parentY });
                 });
             }
 
-            // Calculer un espacement égal pour les grands-parents
-            const grandparents = nodesByGeneration.get(2) || [];
-            const gen2Y = verticalPositions.get(2) || height * 0.3;
+            // Calculer un espacement égal pour les grands-parents (génération + 2)
+            const grandParentGen = principal.generation + 2;
+            const grandparents = nodesByGeneration.get(grandParentGen) || [];
+            const grandParentY = verticalPositions.get(grandParentGen) || height * 0.3;
 
             // Diviser la largeur en sections égales pour les grands-parents
-            // Nous avons besoin de 4 positions: grand-père paternel, grand-mère paternelle, 
-            // grand-père maternel, grand-mère maternelle
-            const gen2Spacing = width / 4; // Divisé par 5 pour avoir 4 espaces égaux avec marge
+            const gen2Spacing = width / 5; // Divisé par 5 pour avoir 4 espaces égaux avec marge
 
-            // Identifier les différents types de grands-parents
+            // Identifier les différents types de grands-parents par leurs relations
             const paternalGrandfather = grandparents.find(n => n.relation.includes('grand-pere-paternel'));
             const paternalGrandmother = grandparents.find(n => n.relation.includes('grand-mere-paternelle'));
             const maternalGrandfather = grandparents.find(n => n.relation.includes('grand-pere-maternel'));
@@ -194,27 +210,25 @@ export class TreeLayoutUtils {
 
             // Placer les grands-parents avec un espacement équidistant
             if (paternalGrandfather) {
-                nodePositions.set(paternalGrandfather.id, { x: gen2Spacing * 1, y: gen2Y });
+                nodePositions.set(paternalGrandfather.id, { x: gen2Spacing * 1, y: grandParentY });
             }
             if (paternalGrandmother) {
-                nodePositions.set(paternalGrandmother.id, { x: gen2Spacing * 2, y: gen2Y });
+                nodePositions.set(paternalGrandmother.id, { x: gen2Spacing * 2, y: grandParentY });
             }
             if (maternalGrandfather) {
-                nodePositions.set(maternalGrandfather.id, { x: gen2Spacing * 3, y: gen2Y });
+                nodePositions.set(maternalGrandfather.id, { x: gen2Spacing * 3, y: grandParentY });
             }
             if (maternalGrandmother) {
-                nodePositions.set(maternalGrandmother.id, { x: gen2Spacing * 4, y: gen2Y });
+                nodePositions.set(maternalGrandmother.id, { x: gen2Spacing * 4, y: grandParentY });
             }
 
-            // Placer les arrière-grands-parents (génération 3) avec le même espacement que les grands-parents
-            const greatGrandparents = nodesByGeneration.get(3) || [];
-            const gen3Y = verticalPositions.get(3) || height * 0.1;
-
-            // MODIFICATION: Utiliser le même espacement que pour la génération 2
-            // au lieu de diviser par 2 comme auparavant
+            // Placer les arrière-grands-parents (génération + 3)
+            const greatGrandParentGen = principal.generation + 3;
+            const greatGrandparents = nodesByGeneration.get(greatGrandParentGen) || [];
+            const greatGrandParentY = verticalPositions.get(greatGrandParentGen) || height * 0.1;
             const gen3Spacing = gen2Spacing;
 
-            // Grouper les arrière-grands-parents par branche
+            // Grouper les arrière-grands-parents par leurs relations
             const ppGrandfather = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-paternel'));
             const ppGrandmother = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-paternelle-paternelle'));
             const pmGrandfather = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-maternel'));
@@ -224,16 +238,15 @@ export class TreeLayoutUtils {
             const mmGrandfather = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-maternel-maternel'));
             const mmGrandmother = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-maternelle-maternelle'));
 
-            // MODIFICATION: Ajuster les positions pour maintenir l'espacement équidistant
-            // tout en évitant les chevauchements avec 8 positions sur la largeur complète
-            if (ppGrandfather) nodePositions.set(ppGrandfather.id, { x: gen3Spacing * 0.5, y: gen3Y });
-            if (ppGrandmother) nodePositions.set(ppGrandmother.id, { x: gen3Spacing * 1.5, y: gen3Y });
-            if (pmGrandfather) nodePositions.set(pmGrandfather.id, { x: gen3Spacing * 2.5, y: gen3Y });
-            if (pmGrandmother) nodePositions.set(pmGrandmother.id, { x: gen3Spacing * 3.5, y: gen3Y });
-            if (mpGrandfather) nodePositions.set(mpGrandfather.id, { x: gen3Spacing * 4.5, y: gen3Y });
-            if (mpGrandmother) nodePositions.set(mpGrandmother.id, { x: gen3Spacing * 5.5, y: gen3Y });
-            if (mmGrandfather) nodePositions.set(mmGrandfather.id, { x: gen3Spacing * 6.5, y: gen3Y });
-            if (mmGrandmother) nodePositions.set(mmGrandmother.id, { x: gen3Spacing * 7.5, y: gen3Y });
+            // Positionner les arrière-grands-parents
+            if (ppGrandfather) nodePositions.set(ppGrandfather.id, { x: gen2Spacing * 0.5, y: greatGrandParentY });
+            if (ppGrandmother) nodePositions.set(ppGrandmother.id, { x: gen2Spacing * 1.5, y: greatGrandParentY });
+            if (pmGrandfather) nodePositions.set(pmGrandfather.id, { x: gen2Spacing * 2.5, y: greatGrandParentY });
+            if (pmGrandmother) nodePositions.set(pmGrandmother.id, { x: gen2Spacing * 3.5, y: greatGrandParentY });
+            if (mpGrandfather) nodePositions.set(mpGrandfather.id, { x: gen2Spacing * 4.5, y: greatGrandParentY });
+            if (mpGrandmother) nodePositions.set(mpGrandmother.id, { x: gen2Spacing * 5.5, y: greatGrandParentY });
+            if (mmGrandfather) nodePositions.set(mmGrandfather.id, { x: gen2Spacing * 6.5, y: greatGrandParentY });
+            if (mmGrandmother) nodePositions.set(mmGrandmother.id, { x: gen2Spacing * 7.5, y: greatGrandParentY });
 
             // Pour les nœuds qui n'auraient pas de position calculée (cas rares)
             // Attribuer une position par défaut basée sur leur relation

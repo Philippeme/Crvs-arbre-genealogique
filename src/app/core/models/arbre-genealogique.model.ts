@@ -17,6 +17,10 @@ export interface TreeNode {
     children?: TreeNode[];
     x?: number; // Position horizontale pour l'affichage
     y?: number; // Position verticale pour l'affichage
+
+    // Propriétés ajoutées pour faciliter la création de l'arbre
+    ninaPere?: string;
+    ninaMere?: string;
 }
 
 export interface TreeLink {

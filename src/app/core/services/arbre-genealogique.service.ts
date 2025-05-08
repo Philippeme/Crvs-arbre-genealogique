@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError, forkJoin } from 'rxjs';
-import { map, switchMap, catchError } from 'rxjs/operators'; // Ajout de catchError manquant
+import { map, switchMap, catchError } from 'rxjs/operators';
 
 import {
     ArbreGenealogique,
@@ -26,15 +26,19 @@ export class ArbreGenealogiqueService {
      * Récupère ou crée un arbre généalogique pour une personne
      */
     getArbreGenealogique(personneId: string): Observable<ArbreGenealogique> {
-        // Vérifier d'abord si l'arbre existe déjà
-        const arbreExistant = this.dataStorageService.getArbreByPersonneId(personneId);
-        if (arbreExistant) {
-            return of(arbreExistant);
-        }
-
-        // Sinon, construire un nouvel arbre
+        // Récupérer la personne d'abord
         return this.personneService.getPersonneById(personneId).pipe(
             switchMap(personneprincipale => {
+                // Vérifier d'abord si l'arbre existe déjà pour cette personne
+                // Si c'est le cas et que la personne est déjà la principale, utiliser cet arbre
+                const arbreExistant = this.dataStorageService.getArbreByPersonneId(personneId);
+                if (arbreExistant && arbreExistant.personneprincipale.id === personneId) {
+                    console.log("Utilisation d'un arbre existant pour", personneprincipale.nom, personneprincipale.prenom);
+                    return of(arbreExistant);
+                }
+
+                // Sinon, construire un nouvel arbre avec cette personne comme principale
+                console.log("Construction d'un nouvel arbre pour", personneprincipale.nom, personneprincipale.prenom);
                 return this.construireArbre(personneprincipale);
             })
         );
@@ -44,19 +48,26 @@ export class ArbreGenealogiqueService {
      * Construit un arbre généalogique complet pour une personne
      */
     private construireArbre(personneprincipale: Personne): Observable<ArbreGenealogique> {
+        // Préparer la personne comme principale en réinitialisant les attributs pertinents
+        const personneModifiee: Personne = {
+            ...personneprincipale,
+            relationTypeAvecPrincipal: 'principal'
+        };
+
         // Initialiser l'arbre avec la personne principale
         const arbre: ArbreGenealogique = {
-            personneprincipale,
-            membres: [personneprincipale]
+            personneprincipale: personneModifiee,
+            membres: [personneModifiee]
         };
 
         // Si nous n'avons pas les NINA des parents, retourner l'arbre avec juste la personne principale
-        if (!personneprincipale.ninaPere && !personneprincipale.ninaMere) {
+        if (!personneModifiee.ninaPere && !personneModifiee.ninaMere) {
+            this.dataStorageService.saveArbre(arbre);
             return of(arbre);
         }
 
         // Récupérer tous les membres potentiels de l'arbre (jusqu'à 3 générations)
-        return this.getAllFamilyMembers(personneprincipale).pipe(
+        return this.getAllFamilyMembers(personneModifiee).pipe(
             map(membres => {
                 arbre.membres = membres;
                 // Enregistrer et retourner l'arbre complet
@@ -67,8 +78,9 @@ export class ArbreGenealogiqueService {
     }
 
     /**
- * Récupère tous les membres de la famille jusqu'à 3 générations
- */
+     * Récupère tous les membres de la famille jusqu'à 3 générations
+     * Ajuste également les relations pour refléter la nouvelle personne principale
+     */
     private getAllFamilyMembers(personneprincipale: Personne): Observable<Personne[]> {
         // Commencer avec la personne principale
         const membres: Personne[] = [personneprincipale];
@@ -80,32 +92,79 @@ export class ArbreGenealogiqueService {
                 const pere = allPersons.find(p => p.nina === personneprincipale.ninaPere);
                 const mere = allPersons.find(p => p.nina === personneprincipale.ninaMere);
 
-                if (pere) membres.push(pere);
-                if (mere) membres.push(mere);
+                // Ajouter les parents avec les relations ajustées
+                if (pere) {
+                    const pereAjuste: Personne = { ...pere, relationTypeAvecPrincipal: 'pere' };
+                    membres.push(pereAjuste);
+                }
+
+                if (mere) {
+                    const mereAjustee: Personne = { ...mere, relationTypeAvecPrincipal: 'mere' };
+                    membres.push(mereAjustee);
+                }
 
                 // Identifier les grands-parents paternels
                 if (pere) {
                     const grandPerePaternel = allPersons.find(p => p.nina === pere.ninaPere);
                     const grandMerePaternelle = allPersons.find(p => p.nina === pere.ninaMere);
 
-                    if (grandPerePaternel) membres.push(grandPerePaternel);
-                    if (grandMerePaternelle) membres.push(grandMerePaternelle);
+                    if (grandPerePaternel) {
+                        const gppAjuste: Personne = {
+                            ...grandPerePaternel,
+                            relationTypeAvecPrincipal: 'grand-pere-paternel'
+                        };
+                        membres.push(gppAjuste);
+                    }
+
+                    if (grandMerePaternelle) {
+                        const gmpAjustee: Personne = {
+                            ...grandMerePaternelle,
+                            relationTypeAvecPrincipal: 'grand-mere-paternelle'
+                        };
+                        membres.push(gmpAjustee);
+                    }
 
                     // Identifier les arrière-grands-parents côté paternel
                     if (grandPerePaternel) {
                         const arriereGPPP = allPersons.find(p => p.nina === grandPerePaternel.ninaPere);
                         const arriereGMPP = allPersons.find(p => p.nina === grandPerePaternel.ninaMere);
 
-                        if (arriereGPPP) membres.push(arriereGPPP);
-                        if (arriereGMPP) membres.push(arriereGMPP);
+                        if (arriereGPPP) {
+                            const agpppAjuste: Personne = {
+                                ...arriereGPPP,
+                                relationTypeAvecPrincipal: 'arriere-grand-pere-paternel-paternel'
+                            };
+                            membres.push(agpppAjuste);
+                        }
+
+                        if (arriereGMPP) {
+                            const agmppAjustee: Personne = {
+                                ...arriereGMPP,
+                                relationTypeAvecPrincipal: 'arriere-grand-mere-paternelle-paternelle'
+                            };
+                            membres.push(agmppAjustee);
+                        }
                     }
 
                     if (grandMerePaternelle) {
                         const arriereGPPM = allPersons.find(p => p.nina === grandMerePaternelle.ninaPere);
                         const arriereGMPM = allPersons.find(p => p.nina === grandMerePaternelle.ninaMere);
 
-                        if (arriereGPPM) membres.push(arriereGPPM);
-                        if (arriereGMPM) membres.push(arriereGMPM);
+                        if (arriereGPPM) {
+                            const agppmAjuste: Personne = {
+                                ...arriereGPPM,
+                                relationTypeAvecPrincipal: 'arriere-grand-pere-paternel-maternel'
+                            };
+                            membres.push(agppmAjuste);
+                        }
+
+                        if (arriereGMPM) {
+                            const agmpmAjustee: Personne = {
+                                ...arriereGMPM,
+                                relationTypeAvecPrincipal: 'arriere-grand-mere-paternelle-maternelle'
+                            };
+                            membres.push(agmpmAjustee);
+                        }
                     }
                 }
 
@@ -114,24 +173,63 @@ export class ArbreGenealogiqueService {
                     const grandPereMaternel = allPersons.find(p => p.nina === mere.ninaPere);
                     const grandMereMaternelle = allPersons.find(p => p.nina === mere.ninaMere);
 
-                    if (grandPereMaternel) membres.push(grandPereMaternel);
-                    if (grandMereMaternelle) membres.push(grandMereMaternelle);
+                    if (grandPereMaternel) {
+                        const gpmAjuste: Personne = {
+                            ...grandPereMaternel,
+                            relationTypeAvecPrincipal: 'grand-pere-maternel'
+                        };
+                        membres.push(gpmAjuste);
+                    }
+
+                    if (grandMereMaternelle) {
+                        const gmmAjustee: Personne = {
+                            ...grandMereMaternelle,
+                            relationTypeAvecPrincipal: 'grand-mere-maternelle'
+                        };
+                        membres.push(gmmAjustee);
+                    }
 
                     // Identifier les arrière-grands-parents côté maternel
                     if (grandPereMaternel) {
                         const arriereGPMP = allPersons.find(p => p.nina === grandPereMaternel.ninaPere);
                         const arriereGMMP = allPersons.find(p => p.nina === grandPereMaternel.ninaMere);
 
-                        if (arriereGPMP) membres.push(arriereGPMP);
-                        if (arriereGMMP) membres.push(arriereGMMP);
+                        if (arriereGPMP) {
+                            const agpmpAjuste: Personne = {
+                                ...arriereGPMP,
+                                relationTypeAvecPrincipal: 'arriere-grand-pere-maternel-paternel'
+                            };
+                            membres.push(agpmpAjuste);
+                        }
+
+                        if (arriereGMMP) {
+                            const agmmpAjustee: Personne = {
+                                ...arriereGMMP,
+                                relationTypeAvecPrincipal: 'arriere-grand-mere-maternelle-paternelle'
+                            };
+                            membres.push(agmmpAjustee);
+                        }
                     }
 
                     if (grandMereMaternelle) {
                         const arriereGPMM = allPersons.find(p => p.nina === grandMereMaternelle.ninaPere);
                         const arriereGMMM = allPersons.find(p => p.nina === grandMereMaternelle.ninaMere);
 
-                        if (arriereGPMM) membres.push(arriereGPMM);
-                        if (arriereGMMM) membres.push(arriereGMMM);
+                        if (arriereGPMM) {
+                            const agpmmAjuste: Personne = {
+                                ...arriereGPMM,
+                                relationTypeAvecPrincipal: 'arriere-grand-pere-maternel-maternel'
+                            };
+                            membres.push(agpmmAjuste);
+                        }
+
+                        if (arriereGMMM) {
+                            const agmmmAjustee: Personne = {
+                                ...arriereGMMM,
+                                relationTypeAvecPrincipal: 'arriere-grand-mere-maternelle-maternelle'
+                            };
+                            membres.push(agmmmAjustee);
+                        }
                     }
                 }
 
@@ -149,6 +247,9 @@ export class ArbreGenealogiqueService {
 
         // Ajouter tous les membres comme nœuds
         arbre.membres.forEach(membre => {
+            // S'assurer que la personne principale est correctement identifiée
+            const isPrincipal = membre.id === arbre.personneprincipale.id;
+
             nodes.push({
                 id: membre.id,
                 nina: membre.nina,
@@ -156,7 +257,10 @@ export class ArbreGenealogiqueService {
                 prenom: membre.prenom,
                 genre: membre.genre,
                 generation: membre.generation || 0,
-                relation: membre.relationTypeAvecPrincipal || 'inconnu'
+                relation: isPrincipal ? 'principal' : (membre.relationTypeAvecPrincipal || 'inconnu'),
+                // Ajouter les propriétés ninaPere et ninaMere pour les utiliser dans TreeLayoutUtils
+                ninaPere: membre.ninaPere,
+                ninaMere: membre.ninaMere
             });
 
             // Créer des liens parent-enfant

@@ -91,8 +91,8 @@
         </div>
 
         <div class="details-actions">
-            <!-- AMÉLIORATION: Ajout d'un test pour vérifier que currentPersonne est disponible -->
-            <button class="btn-view-tree" *ngIf="currentPersonne" (click)="onViewArbre(currentPersonne)">
+            <button class="btn-view-tree" *ngIf="currentPersonne && currentPersonne.id"
+                (click)="onViewArbre(currentPersonne)">
                 <i class="fas fa-sitemap"></i> Voir l'arbre généalogique
             </button>
         </div>
