@@ -75,28 +75,63 @@ export class TreeLayoutUtils {
 
     /**
      * Crée une disposition par génération pour un arbre généalogique
-     * Garantit l'affichage complet de tous les nœuds
+     * Garantit l'affichage complet de tous les nœuds avec un espacement optimal
+     * et une séparation claire des branches paternelles et maternelles
      */
     static createGenerationalLayout(treeData: TreeData, width: number, height: number): { nodes: PositionedTreeNode[], links: { source: string, target: string, type: string }[] } {
         // Grouper les nœuds par génération
         const nodesByGeneration = new Map<number, TreeNode[]>();
+        const nodesMap = new Map<string, TreeNode>();
 
+        // Carte des relations parent-enfant pour tracer correctement les liens
+        const childToParents = new Map<string, { father?: string, mother?: string }>();
+
+        // Remplir les maps
         treeData.nodes.forEach(node => {
+            // Ajouter le nœud à la map par ID
+            nodesMap.set(node.id, node);
+
+            // Grouper par génération
             if (!nodesByGeneration.has(node.generation)) {
                 nodesByGeneration.set(node.generation, []);
             }
             nodesByGeneration.get(node.generation)?.push(node);
         });
 
+        // Établir les relations parent-enfant
+        treeData.links.forEach(link => {
+            const sourceNode = nodesMap.get(link.source);
+            const targetNode = nodesMap.get(link.target);
+
+            if (sourceNode && targetNode) {
+                // Si la source a une génération plus élevée que la cible, c'est un parent
+                if (sourceNode.generation > targetNode.generation) {
+                    if (!childToParents.has(targetNode.id)) {
+                        childToParents.set(targetNode.id, {});
+                    }
+
+                    // Déterminer s'il s'agit du père ou de la mère
+                    const relationInfo = childToParents.get(targetNode.id)!;
+
+                    if (sourceNode.genre === 'M' || sourceNode.relation.includes('pere') || sourceNode.relation.includes('paternel')) {
+                        relationInfo.father = sourceNode.id;
+                    } else if (sourceNode.genre === 'F' || sourceNode.relation.includes('mere') || sourceNode.relation.includes('maternel')) {
+                        relationInfo.mother = sourceNode.id;
+                    }
+                }
+            }
+        });
+
         // Calculer les positions des nœuds pour chaque génération
         const generations = Array.from(nodesByGeneration.keys()).sort();
         const maxGeneration = Math.max(...generations);
 
-        // Répartir verticalement les générations
-        const totalHeight = height * 0.9;
+        // Répartir verticalement les générations avec un espacement plus important
+        const totalHeight = height * 0.85;
 
-        // Espacement vertical entre les générations
-        const verticalSpacing = totalHeight / (maxGeneration + 1);
+        // Augmenter l'espacement vertical entre les générations
+        // Plus l'arbre est grand, plus l'espacement est important
+        const verticalSpacing = totalHeight / (maxGeneration + 1) * 1.8;
 
         // Positions verticales pour chaque génération (du bas vers le haut)
         const verticalPositions = new Map<number, number>();
@@ -105,82 +140,140 @@ export class TreeLayoutUtils {
             verticalPositions.set(gen, height - (verticalSpacing * (gen + 0.5)));
         });
 
+        // Stocker les positions horizontales calculées pour chaque nœud
+        const nodePositions = new Map<string, { x: number, y: number }>();
+
+        // Positions horizontales de référence pour chaque branche
+        const centerX = width / 2;
+
         // Résultats pour les nœuds positionnés
         const positionedNodes: PositionedTreeNode[] = [];
 
-        // Traiter chaque génération
-        generations.forEach(generation => {
-            const nodesInGen = nodesByGeneration.get(generation) || [];
-            const count = nodesInGen.length;
+        // Commencer par placer la personne principale (génération 0)
+        const principal = treeData.nodes.find(n => n.generation === 0);
+        if (principal) {
+            const y = verticalPositions.get(0) || height * 0.9;
+            nodePositions.set(principal.id, { x: centerX, y });
 
-            if (count === 0) return;
+            // Placer les nœuds de la génération 1 (parents)
+            const parents = nodesByGeneration.get(1) || [];
+            const fatherNodes = parents.filter(n => n.genre === 'M' || n.relation.includes('pere'));
+            const motherNodes = parents.filter(n => n.genre === 'F' || n.relation.includes('mere'));
 
-            // Position verticale pour cette génération
-            const y = verticalPositions.get(generation) || 0;
+            const gen1Y = verticalPositions.get(1) || height * 0.6;
 
-            // Trier les nœuds par relation pour un meilleur arrangement
-            const sortedNodes = [...nodesInGen].sort((a, b) => {
-                // La personne principale est toujours au centre
-                if (a.relation === 'principal') return -1;
-                if (b.relation === 'principal') return 1;
-
-                // Grouper par côté paternel/maternel
-                const aPaternel = a.relation.includes('pere') || a.relation.includes('paternel');
-                const bPaternel = b.relation.includes('pere') || b.relation.includes('paternel');
-
-                if (aPaternel && !bPaternel) return -1;
-                if (!aPaternel && bPaternel) return 1;
-
-                return a.relation.localeCompare(b.relation);
-            });
-
-            // Utilisation de toute la largeur disponible
-            const usableWidth = width * 0.9;
-            const nodeSpacing = usableWidth / (count + 1);
-
-            // Distribuer les nœuds horizontalement
-            sortedNodes.forEach((node, index) => {
-                // Position horizontale calculée
-                let x = nodeSpacing * (index + 1);
-
-                // Ajustement spécial pour les arbres avec peu de nœuds par génération
-                if (count <= 2 && node.relation === 'principal') {
-                    x = width / 2; // Centrer la personne principale
-                }
-
-                // Ajout aux résultats
-                positionedNodes.push({
-                    ...node,
-                    x,
-                    y
-                });
-            });
-        });
-
-        // Vérifier si tous les nœuds sont inclus
-        const allNodeIds = new Set(treeData.nodes.map(n => n.id));
-        const positionedIds = new Set(positionedNodes.map(n => n.id));
-
-        // Ajouter les nœuds manquants avec une position par défaut
-        treeData.nodes.forEach(node => {
-            if (!positionedIds.has(node.id)) {
-                const y = verticalPositions.get(node.generation) || (height / 2);
-                let x = width / 2; // Position par défaut au centre
-
-                // Ajustement selon la relation
-                if (node.relation.includes('pere') || node.relation.includes('paternel')) {
-                    x = width * 0.25; // Côté gauche
-                } else if (node.relation.includes('mere') || node.relation.includes('maternel')) {
-                    x = width * 0.75; // Côté droit
-                }
-
-                positionedNodes.push({
-                    ...node,
-                    x,
-                    y
+            // Placer le père à gauche
+            if (fatherNodes.length > 0) {
+                const fatherX = centerX - width * 0.15;
+                fatherNodes.forEach(father => {
+                    nodePositions.set(father.id, { x: fatherX, y: gen1Y });
                 });
             }
-        });
+
+            // Placer la mère à droite
+            if (motherNodes.length > 0) {
+                const motherX = centerX + width * 0.15;
+                motherNodes.forEach(mother => {
+                    nodePositions.set(mother.id, { x: motherX, y: gen1Y });
+                });
+            }
+
+            // Placer les grands-parents (génération 2)
+            const grandparents = nodesByGeneration.get(2) || [];
+            const gen2Y = verticalPositions.get(2) || height * 0.3;
+
+            // Identifier les différents types de grands-parents
+            const paternalGrandparents = grandparents.filter(n =>
+                n.relation.includes('grand-pere-paternel') || n.relation.includes('grand-mere-paternelle'));
+            const maternalGrandparents = grandparents.filter(n =>
+                n.relation.includes('grand-pere-maternel') || n.relation.includes('grand-mere-maternelle'));
+
+            // Regrouper les grands-parents paternels (père du père, mère du père)
+            const paternalGrandfather = paternalGrandparents.find(n => n.relation.includes('grand-pere-paternel'));
+            const paternalGrandmother = paternalGrandparents.find(n => n.relation.includes('grand-mere-paternelle'));
+
+            // Regrouper les grands-parents maternels (père de la mère, mère de la mère)
+            const maternalGrandfather = maternalGrandparents.find(n => n.relation.includes('grand-pere-maternel'));
+            const maternalGrandmother = maternalGrandparents.find(n => n.relation.includes('grand-mere-maternelle'));
+
+            // Calculer les positions horizontales avec un écart plus important pour cette génération
+            const quarterWidth = width * 0.25;
+
+            // Placer les grands-parents paternels dans le quart gauche
+            if (paternalGrandfather) {
+                nodePositions.set(paternalGrandfather.id, { x: quarterWidth * 0.5, y: gen2Y });
+            }
+            if (paternalGrandmother) {
+                nodePositions.set(paternalGrandmother.id, { x: quarterWidth * 1.5, y: gen2Y });
+            }
+
+            // Placer les grands-parents maternels dans le quart droit
+            if (maternalGrandfather) {
+                nodePositions.set(maternalGrandfather.id, { x: quarterWidth * 2.5, y: gen2Y });
+            }
+            if (maternalGrandmother) {
+                nodePositions.set(maternalGrandmother.id, { x: quarterWidth * 3.5, y: gen2Y });
+            }
+
+            // Placer les arrière-grands-parents (génération 3)
+            const greatGrandparents = nodesByGeneration.get(3) || [];
+            const gen3Y = verticalPositions.get(3) || height * 0.1;
+
+            // Diviser la largeur disponible en 8 sections pour les arrière-grands-parents
+            const sectionWidth = width / 8;
+
+            // Groupe 1: Arrière-grands-parents paternels côté paternel
+            const pgpf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-paternel'));
+            const pgpm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-paternelle-paternelle'));
+
+            // Groupe 2: Arrière-grands-parents maternels côté paternel
+            const pgmf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-maternel'));
+            const pgmm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-paternelle-maternelle'));
+
+            // Groupe 3: Arrière-grands-parents paternels côté maternel
+            const mgpf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-maternel-paternel'));
+            const mgpm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-maternelle-paternelle'));
+
+            // Groupe 4: Arrière-grands-parents maternels côté maternel
+            const mgmf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-maternel-maternel'));
+            const mgmm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-maternelle-maternelle'));
+
+            // Positionner chaque groupe avec un espacement égal
+            if (pgpf) nodePositions.set(pgpf.id, { x: sectionWidth * 0.5, y: gen3Y });
+            if (pgpm) nodePositions.set(pgpm.id, { x: sectionWidth * 1.5, y: gen3Y });
+            if (pgmf) nodePositions.set(pgmf.id, { x: sectionWidth * 2.5, y: gen3Y });
+            if (pgmm) nodePositions.set(pgmm.id, { x: sectionWidth * 3.5, y: gen3Y });
+            if (mgpf) nodePositions.set(mgpf.id, { x: sectionWidth * 4.5, y: gen3Y });
+            if (mgpm) nodePositions.set(mgpm.id, { x: sectionWidth * 5.5, y: gen3Y });
+            if (mgmf) nodePositions.set(mgmf.id, { x: sectionWidth * 6.5, y: gen3Y });
+            if (mgmm) nodePositions.set(mgmm.id, { x: sectionWidth * 7.5, y: gen3Y });
+
+            // Pour les nœuds qui n'auraient pas de position calculée (cas rares)
+            // Attribuer une position par défaut basée sur leur relation
+            treeData.nodes.forEach(node => {
+                if (!nodePositions.has(node.id)) {
+                    const y = verticalPositions.get(node.generation) || height / 2;
+                    let x = width / 2; // Position par défaut au centre
+
+                    // Ajustement selon la relation familiale
+                    if (node.relation.includes('pere') || node.relation.includes('paternel')) {
+                        x = width * 0.25; // Côté gauche
+                    } else if (node.relation.includes('mere') || node.relation.includes('maternel')) {
+                        x = width * 0.75; // Côté droit
+                    }
+
+                    nodePositions.set(node.id, { x, y });
+                }
+
+                // Créer le nœud positionné
+                const position = nodePositions.get(node.id)!;
+                positionedNodes.push({
+                    ...node,
+                    x: position.x,
+                    y: position.y
+                });
+            });
+        }
 
         return {
             nodes: positionedNodes,
