@@ -210,38 +210,8 @@
         overflow: visible;
         /* Permet l'affichage au-delà des limites du conteneur */
 
-        &.tree-branches {
-
-            /* Styles spécifiques pour la structure avec branches séparées */
-            .tree-link {
-                fill: none;
-                stroke-width: 2px;
-                stroke-opacity: 0.8;
-                transition: stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s;
-
-                &:hover {
-                    stroke-opacity: 1;
-                    stroke-width: 3px;
-                }
-
-                /* Styles différents pour les types de liens */
-                &.paternal-link {
-                    stroke: #2196f3;
-                    /* Bleu pour les liens paternels */
-                }
-
-                &.maternal-link {
-                    stroke: #e91e63;
-                    /* Rose pour les liens maternels */
-                }
-
-                /* Style spécial pour les liens avec la personne principale */
-                &.principal-link {
-                    stroke-width: 3px;
-                    animation: pulse 3s infinite;
-                }
-            }
-        }
+        // MODIFICATION: Suppression des styles spécifiques à la vue par génération
+        // pour utiliser uniquement les styles uniformes des liens
 
         .tree-link {
             fill: none;

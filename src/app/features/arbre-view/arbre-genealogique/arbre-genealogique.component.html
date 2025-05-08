@@ -15,6 +15,7 @@
                 <input type="text" class="nina-input" maxlength="15" pattern="[0-9]*" placeholder="NINA (15 chiffres)"
                     [(ngModel)]="searchNina" (input)="validateNinaInput($event)">
             </div>
+            <!-- AMÉLIORATION: Ajout d'un indicateur de bouton disabled quand le NINA n'est pas valide -->
             <button class="btn-search" [disabled]="!isNinaValid" (click)="findPersonByNina()">
                 <i class="fas fa-eye"></i> Voir l'arbre de cette personne
             </button>
@@ -64,8 +65,10 @@
                 </div>
             </div>
 
+            <!-- AMÉLIORATION: Vérification plus robuste que la personne sélectionnée n'est pas déjà l'affichage principal -->
             <div class="actions">
-                <button class="btn-view-tree" *ngIf="arbre && arbre.personneprincipale.id !== selectedPerson.id"
+                <button class="btn-view-tree"
+                    *ngIf="selectedPerson && (!arbre || arbre.personneprincipale.id !== selectedPerson.id)"
                     (click)="loadArbre(selectedPerson.id)">
                     <i class="fas fa-sitemap"></i> Voir l'arbre de cette personne
                 </button>

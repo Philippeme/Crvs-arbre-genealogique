@@ -107,7 +107,16 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
 
     this.personneService.getPersonneByNina(this.searchNina).subscribe({
       next: (personne) => {
-        this.loadArbre(personne.id);
+        if (personne && personne.id) {
+          // Réinitialiser les paramètres avant de charger le nouvel arbre
+          this.clearCurrentTree();
+          
+          // Charger l'arbre de la personne trouvée
+          this.loadArbre(personne.id);
+        } else {
+          this.isLoading = false;
+          this.error = `Aucune personne trouvée avec le NINA ${this.searchNina}`;
+        }
       },
       error: (err) => {
         this.isLoading = false;
@@ -117,9 +126,28 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   }
 
   /**
+   * Réinitialise l'affichage de l'arbre courant
+   */
+  private clearCurrentTree(): void {
+    this.arbre = null;
+    this.treeData = null;
+    this.selectedPerson = null;
+    
+    // Nettoyer le contenu SVG si présent
+    if (this.svg) {
+      this.svg.select('g.tree-content').selectAll('*').remove();
+    }
+  }
+
+  /**
    * Charge l'arbre généalogique d'une personne
    */
   loadArbre(personneId: string): void {
+    if (!personneId) {
+      this.error = 'ID de personne non spécifié';
+      return;
+    }
+
     this.isLoading = true;
     this.error = null;
 
@@ -132,7 +160,11 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
           this.isLoading = false;
 
           // Redessiner l'arbre après le chargement des données
-          setTimeout(() => this.renderTree(), 0);
+          setTimeout(() => {
+            this.renderTree();
+            // Ajuster le zoom pour voir tout l'arbre
+            this.applyInitialZoom();
+          }, 100);
         },
         error: (err) => {
           this.error = `Erreur lors du chargement de l'arbre: ${err.message}`;
@@ -269,7 +301,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
         Math.max(max, node.generation), 0) || 0;
 
       if (generations >= 3) {
-        scale = 0.18; // Zoom plus faible pour les grands arbres
+        scale = 0.15; // Zoom plus faible pour les grands arbres
       }
     }
 
@@ -467,10 +499,8 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     // Création d'une map des liens par paires source-target pour éviter les doublons
     const linkKeys = new Set<string>();
 
-    // Dessiner les liens avec des courbes optimisées pour éviter les croisements
-    // Utiliser le même style que pour la vue hiérarchique
+    // MODIFICATION: Utiliser exactement le même style de courbe que dans la vue étalée
     this.treeData.links.forEach(link => {
-      // Utiliser le type correct pour source et target
       const source = nodesById.get(link.source);
       const target = nodesById.get(link.target);
 
@@ -485,40 +515,15 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
 
       // Déterminer si c'est un lien paternel ou maternel
       let linkType = 'default-link';
-      let linkColor = '#b3b3b3';
+      let linkColor = '#bdbdbd';
       let strokeWidth = 2;
-      let strokeDasharray = null;
 
       // Déterminer si l'un des nœuds est la personne principale
       const isMainPersonInvolved = source.relation === 'principal' || target.relation === 'principal';
 
-      // Attribuer un type de lien et des styles en fonction de la relation
-      if (source.relation.includes('pere') || target.relation.includes('pere') ||
-        source.relation.includes('paternel') || target.relation.includes('paternel')) {
-        linkType = 'paternal-link';
-        linkColor = '#2196f3'; // Bleu pour les liens paternels
-        strokeWidth = 2.5;
-      } else if (source.relation.includes('mere') || target.relation.includes('mere') ||
-        source.relation.includes('maternel') || target.relation.includes('maternel')) {
-        linkType = 'maternal-link';
-        linkColor = '#e91e63'; // Rose pour les liens maternels
-        strokeWidth = 2.5;
-      }
 
-      // Accentuer le lien avec la personne principale
-      if (isMainPersonInvolved) {
-        strokeWidth = 3;
-        if (linkType === 'paternal-link') {
-          linkColor = '#1976d2'; // Bleu plus foncé pour la personne principale
-        } else if (linkType === 'maternal-link') {
-          linkColor = '#c2185b'; // Rose plus foncé pour la personne principale
-        } else {
-          linkColor = '#4caf50'; // Vert pour les autres liens avec la personne principale
-        }
-      }
-
-      // Utiliser le même style de lien que dans la vue hiérarchique
-      // avec des courbes plus douces et directes
+      // MODIFICATION: Utiliser exactement le même code que dans renderHierarchicalTree
+      // pour dessiner les courbes avec d3.linkHorizontal
       const diagonal = d3.linkHorizontal<any, any>()
         .x((d: any) => d.y)
         .y((d: any) => d.x);
@@ -541,7 +546,6 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
         .attr('d', diagonal(linkData))
         .style('stroke', linkColor)
         .style('stroke-width', strokeWidth)
-        .style('stroke-dasharray', strokeDasharray)
         .style('fill', 'none')
         .style('stroke-opacity', 0.8);
     });
@@ -558,7 +562,6 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       .on('click', (event: any, d: PositionedTreeNode) => {
         this.onTreeNodeClick(d);
       })
-      // Effets d'interaction pour une meilleure expérience utilisateur
       .on('mouseover', (event: any, d: PositionedTreeNode) => {
         // Animation d'agrandissement au survol
         d3.select(event.currentTarget).select('rect')

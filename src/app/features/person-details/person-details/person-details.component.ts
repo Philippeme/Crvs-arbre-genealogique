@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { Observable, of } from 'rxjs';
-import { switchMap, catchError } from 'rxjs/operators'; // Ajout de catchError manquant
+import { switchMap, catchError } from 'rxjs/operators';
 
 import { Personne } from '../../../core/models/personne.model';
 import { PersonneService } from '../../../core/services/personne.service';
@@ -18,6 +18,9 @@ export class PersonDetailsComponent implements OnInit {
   mere$: Observable<Personne | null> = of(null);
   isLoading = false;
   error: string | null = null;
+
+  // Propriété pour stocker la personne actuelle
+  currentPersonne: Personne | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -48,6 +51,8 @@ export class PersonDetailsComponent implements OnInit {
     this.personne$.subscribe({
       next: (personne) => {
         this.isLoading = false;
+        // Stocker la personne pour l'utiliser dans les actions
+        this.currentPersonne = personne;
 
         if (personne.ninaPere) {
           this.pere$ = this.personneService.getPersonneByNina(personne.ninaPere).pipe(
@@ -75,8 +80,16 @@ export class PersonDetailsComponent implements OnInit {
     this.router.navigate(['/person-edit', personne.id]);
   }
 
+  /**
+   * Navigue vers la vue de l'arbre de la personne
+   * AMÉLIORATION: Vérification que l'ID est bien défini avant la navigation
+   */
   onViewArbre(personne: Personne): void {
-    this.router.navigate(['/arbre', personne.id]);
+    if (personne && personne.id) {
+      this.router.navigate(['/arbre', personne.id]);
+    } else {
+      this.error = "Impossible d'afficher l'arbre: information d'identification manquante";
+    }
   }
 
   onGoBack(): void {
