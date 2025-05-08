@@ -9,6 +9,12 @@ import { ArbreGenealogiqueService } from '../../../core/services/arbre-genealogi
 import { PersonneService } from '../../../core/services/personne.service';
 import { TreeLayoutUtils } from '../../../core/utils/tree-layout.utils';
 
+// Interfaces pour les types utilisés dans le rendu
+interface PositionedTreeNode extends TreeNode {
+  x: number;
+  y: number;
+}
+
 // Interface pour les données D3
 interface D3Node {
   data: TreeNode;
@@ -173,7 +179,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
 
     // Configurer le zoom
     this.zoom = d3.zoom()
-      .scaleExtent([0.2, 3]) // Permettre un zoom arrière plus important pour voir l'arbre complet
+      .scaleExtent([0.1, 3]) // Permettre un zoom arrière plus important pour voir l'arbre complet
       .on('zoom', (event: any) => {
         this.svg.select('g.tree-content')
           .attr('transform', event.transform);
@@ -254,8 +260,18 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Définir un facteur de zoom réduit pour voir tout l'arbre
-    const scale = this.viewMode === 'hierarchical' ? 0.35 : 0.5;
+    // Facteur de zoom plus faible pour garantir que tout l'arbre est visible
+    let scale = this.viewMode === 'hierarchical' ? 0.3 : 0.2;
+
+    // Ajuster en fonction du nombre de générations
+    if (this.viewMode === 'generational' && this.treeData) {
+      const generations = this.treeData.nodes.reduce((max, node) =>
+        Math.max(max, node.generation), 0) || 0;
+
+      if (generations >= 3) {
+        scale = 0.18; // Zoom plus faible pour les grands arbres
+      }
+    }
 
     // Centrer l'arbre
     const transform = d3.zoomIdentity
@@ -282,6 +298,13 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     // Effacer le contenu précédent
     this.svg.select('g.tree-content').selectAll('*').remove();
 
+    // Ajouter la classe spécifique en mode génération
+    if (this.viewMode === 'generational') {
+      this.svg.classed('tree-branches', true);
+    } else {
+      this.svg.classed('tree-branches', false);
+    }
+
     // Dessiner l'arbre selon le mode d'affichage sélectionné
     if (this.viewMode === 'hierarchical') {
       this.renderHierarchicalTree(width, height);
@@ -290,7 +313,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     }
 
     // Ajuster automatiquement le zoom pour voir tout l'arbre
-    this.applyInitialZoom();
+    setTimeout(() => this.applyInitialZoom(), 100);
   }
 
   private renderHierarchicalTree(width: number, height: number): void {
@@ -331,6 +354,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
         .append('g')
         .attr('class', 'tree-node')
         .attr('transform', (d: any) => `translate(${d.y},${d.x})`)
+        .attr('data-generation', (d: any) => d.data.generation)
         .on('click', (event: any, d: any) => {
           this.onTreeNodeClick(d.data);
         })
@@ -412,7 +436,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
   private renderGenerationalTree(width: number, height: number): void {
     if (!this.treeData) return;
 
-    // Créer une disposition par génération
+    // Créer une disposition par génération optimisée pour éviter les entre-coupages
     const layoutData = TreeLayoutUtils.createGenerationalLayout(this.treeData, width, height);
 
     // Groupe pour les liens
@@ -425,120 +449,206 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       .append('g')
       .attr('class', 'nodes-group');
 
-    // Dessiner les liens avec des courbes Bézier plus élégantes
-    layoutData.links.forEach(link => {
-      const source = layoutData.nodes.find(n => n.id === link.source);
-      const target = layoutData.nodes.find(n => n.id === link.target);
+    // Vérifier que tous les nœuds ont une position
+    if (layoutData.nodes.length !== this.treeData.nodes.length) {
+      console.warn(`Certains nœuds n'ont pas de position: ${this.treeData.nodes.length - layoutData.nodes.length} nœuds manquants`);
+    }
+
+    // Dessiner les liens avec des courbes optimisées pour éviter les croisements
+    this.treeData.links.forEach(link => {
+      // Utiliser le type correct pour source et target
+      const source = layoutData.nodes.find(n => n.id === link.source) as PositionedTreeNode | undefined;
+      const target = layoutData.nodes.find(n => n.id === link.target) as PositionedTreeNode | undefined;
 
       if (source && target && source.x !== undefined && source.y !== undefined &&
         target.x !== undefined && target.y !== undefined) {
 
-        // Utiliser des points de contrôle pour créer des courbes plus agréables
-        // Ajuster la force de la courbe selon la distance
+        // Déterminer si c'est un lien paternel ou maternel
+        let linkType = 'default-link';
+        let linkColor = '#b3b3b3';
+
+        if (source.relation.includes('pere') || target.relation.includes('pere') ||
+          source.relation.includes('paternel') || target.relation.includes('paternel')) {
+          linkType = 'paternal-link';
+          linkColor = '#2196f3'; // Bleu pour les liens paternels
+        } else if (source.relation.includes('mere') || target.relation.includes('mere') ||
+          source.relation.includes('maternel') || target.relation.includes('maternel')) {
+          linkType = 'maternal-link';
+          linkColor = '#e91e63'; // Rose pour les liens maternels
+        }
+
+        // Calculer les points de contrôle pour une courbe adaptée
+        // Plus le lien est long, plus la courbe est prononcée
         const dx = target.x - source.x;
         const dy = target.y - source.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Créer des points de contrôle pour une courbe en S plus naturelle
+        // Ajuster les courbes selon le type de lien
+        let controlPoint1X, controlPoint1Y, controlPoint2X, controlPoint2Y;
+
+        // Décalage horizontal plus important pour les liens plus longs
+        const horizontalOffset = Math.min(Math.abs(dx) * 0.3, 100);
+
+        if (linkType === 'paternal-link') {
+          // Les liens paternels s'incurvent vers la gauche
+          controlPoint1X = source.x - horizontalOffset;
+          controlPoint1Y = source.y + distance * 0.4;
+          controlPoint2X = target.x - horizontalOffset;
+          controlPoint2Y = target.y - distance * 0.4;
+        } else if (linkType === 'maternal-link') {
+          // Les liens maternels s'incurvent vers la droite
+          controlPoint1X = source.x + horizontalOffset;
+          controlPoint1Y = source.y + distance * 0.4;
+          controlPoint2X = target.x + horizontalOffset;
+          controlPoint2Y = target.y - distance * 0.4;
+        } else {
+          // Liens neutres
+          controlPoint1X = source.x;
+          controlPoint1Y = source.y + distance * 0.4;
+          controlPoint2X = target.x;
+          controlPoint2Y = target.y - distance * 0.4;
+        }
+
+        // Dessiner le lien avec des courbes de Bézier
         linksGroup.append('path')
-          .attr('class', 'tree-link')
+          .attr('class', `tree-link ${linkType}`)
           .attr('d', `M${source.x},${source.y} 
-                    C${source.x},${source.y + distance / 3} 
-                      ${target.x},${target.y - distance / 3} 
+                    C${controlPoint1X},${controlPoint1Y} 
+                      ${controlPoint2X},${controlPoint2Y} 
                       ${target.x},${target.y}`)
-          .style('stroke', '#b3b3b3')
-          .style('stroke-width', 1.5)
+          .style('stroke', linkColor)
+          .style('stroke-width', 2)
           .style('fill', 'none')
-          .style('stroke-opacity', 0.8);
+          .style('stroke-opacity', 0.7);
       }
     });
 
-    // Dessiner les nœuds avec un style amélioré
+    // Dessiner les nœuds de l'arbre
     const nodes = nodesGroup.selectAll('g.tree-node')
       .data(layoutData.nodes)
       .enter()
       .append('g')
-      .attr('class', (d: any) => `tree-node ${d.genre === 'M' ? 'male' : 'female'} ${d.relation === 'principal' ? 'principal' : ''}`)
-      .attr('transform', (d: any) => `translate(${d.x},${d.y})`)
-      .on('click', (event: any, d: any) => {
+      .attr('class', (d: PositionedTreeNode) => `tree-node ${d.genre === 'M' ? 'male' : 'female'} ${d.relation === 'principal' ? 'principal' : ''}`)
+      .attr('transform', (d: PositionedTreeNode) => `translate(${d.x},${d.y})`)
+      .attr('data-generation', (d: PositionedTreeNode) => d.generation)
+      .attr('data-relation', (d: PositionedTreeNode) => d.relation)
+      .on('click', (event: any, d: PositionedTreeNode) => {
         this.onTreeNodeClick(d);
       })
-      // Utiliser des fonctions fléchées pour éviter les problèmes de 'this'
-      .on('mouseover', (event: any, d: any) => {
-        // Utiliser event.currentTarget au lieu de this
+      // Effets d'interaction pour une meilleure expérience utilisateur
+      .on('mouseover', (event: any, d: PositionedTreeNode) => {
+        // Animation d'agrandissement au survol
         d3.select(event.currentTarget).select('rect')
           .transition()
           .duration(300)
-          .attr('width', 200) // Augmenté
-          .attr('height', 100) // Augmenté
-          .attr('x', -100) // Ajusté
-          .attr('y', -50); // Ajusté
+          .attr('width', 200)
+          .attr('height', 100)
+          .attr('x', -100)
+          .attr('y', -50);
+
+        // Mettre en évidence ce nœud
+        d3.select(event.currentTarget)
+          .style('filter', 'drop-shadow(0 0 5px rgba(0,0,0,0.3))');
+
+        // Mettre en évidence les liens connectés à ce nœud
+        linksGroup.selectAll('path.tree-link')
+          .filter((link: any) => {
+            const linkData = link as any;
+            return linkData.source?.id === d.id || linkData.target?.id === d.id;
+          })
+          .style('stroke-opacity', 1)
+          .style('stroke-width', 3);
       })
-      .on('mouseout', (event: any, d: any) => {
-        // Utiliser event.currentTarget au lieu de this
+      .on('mouseout', (event: any, d: PositionedTreeNode) => {
+        // Retour à la taille normale
         d3.select(event.currentTarget).select('rect')
           .transition()
           .duration(300)
-          .attr('width', 180) // Augmenté
-          .attr('height', 90) // Augmenté
-          .attr('x', -90) // Ajusté
-          .attr('y', -45); // Ajusté
+          .attr('width', 180)
+          .attr('height', 90)
+          .attr('x', -90)
+          .attr('y', -45);
+
+        // Réinitialiser l'ombre
+        d3.select(event.currentTarget)
+          .style('filter', null);
+
+        // Réinitialiser les liens
+        linksGroup.selectAll('path.tree-link')
+          .style('stroke-opacity', 0.7)
+          .style('stroke-width', 2);
       });
 
-    // Ajouter des rectangles aux nœuds avec des coins arrondis et des styles améliorés
+    // Ajouter des rectangles aux nœuds avec les couleurs précédentes selon le genre
     nodes.append('rect')
-      .attr('x', -90) // Augmenté
-      .attr('y', -45) // Ajusté
-      .attr('width', 180) // Augmenté
-      .attr('height', 90) // Augmenté
+      .attr('x', -90)
+      .attr('y', -45)
+      .attr('width', 180)
+      .attr('height', 90)
       .attr('rx', 8)
       .attr('ry', 8)
-      .attr('fill', (d: any) => {
-        // Couleurs plus douces pour chaque génération
-        const baseColor = d.genre === 'M' ? '#e3f2fd' : '#fce4ec';
-        const alpha = d.relation === 'principal' ? 1 : 0.7 + (0.3 / (d.generation + 1));
-        return baseColor;
+      .attr('fill', (d: PositionedTreeNode) => {
+        // Restaurer les couleurs basées sur le genre
+        if (d.relation === 'principal') {
+          return '#e8f5e9'; // Vert pâle pour la personne principale
+        } else {
+          return d.genre === 'M' ? '#e3f2fd' : '#fce4ec'; // Bleu pâle pour les hommes, rose pâle pour les femmes
+        }
       })
-      .style('stroke', (d: any) => d.genre === 'M' ? '#2196f3' : '#e91e63')
-      .style('stroke-width', (d: any) => d.relation === 'principal' ? 3 : 1.5)
-      .style('filter', (d: any) => d.relation === 'principal' ?
-        'drop-shadow(0 2px 5px rgba(0,0,0,0.2))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))');
+      .style('stroke', (d: PositionedTreeNode) => {
+        // Couleur de bordure basée sur le genre
+        if (d.relation === 'principal') {
+          return '#4caf50'; // Vert pour la personne principale
+        } else {
+          return d.genre === 'M' ? '#2196f3' : '#e91e63'; // Bleu pour les hommes, rose pour les femmes
+        }
+      })
+      .style('stroke-width', (d: PositionedTreeNode) => {
+        // Bordure plus épaisse pour la personne principale
+        return d.relation === 'principal' ? 3 : 1.5;
+      })
+      .style('filter', (d: PositionedTreeNode) => {
+        // Ombre portée plus marquée pour la personne principale
+        return d.relation === 'principal'
+          ? 'drop-shadow(0 2px 5px rgba(0,0,0,0.2))'
+          : 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))';
+      });
 
     // Ajouter un icône de genre
     nodes.append('text')
       .attr('class', 'gender-icon')
-      .attr('dy', '-25') // Ajusté pour laisser place aux autres informations
+      .attr('dy', '-25')
       .attr('text-anchor', 'middle')
       .attr('font-family', 'FontAwesome')
-      .text((d: any) => d.genre === 'M' ? '\uf222' : '\uf221') // Icônes Font Awesome pour homme/femme
+      .text((d: PositionedTreeNode) => d.genre === 'M' ? '\uf222' : '\uf221') // Icônes Font Awesome pour homme/femme
       .style('font-size', '14px')
-      .style('fill', (d: any) => d.genre === 'M' ? '#1976d2' : '#d81b60');
+      .style('fill', (d: PositionedTreeNode) => d.genre === 'M' ? '#1976d2' : '#d81b60');
 
     // Ajouter les noms des personnes (nom et prénom)
     nodes.append('text')
-      .attr('dy', '-5') // Ajusté
+      .attr('dy', '-5')
       .attr('text-anchor', 'middle')
       .attr('class', 'node-name')
-      .text((d: any) => `${d.nom} ${d.prenom}`)
+      .text((d: PositionedTreeNode) => `${d.nom} ${d.prenom}`)
       .style('font-size', '13px')
-      .style('font-weight', (d: any) => d.relation === 'principal' ? 'bold' : 'normal')
+      .style('font-weight', (d: PositionedTreeNode) => d.relation === 'principal' ? 'bold' : 'normal')
       .style('fill', '#333');
 
     // Ajouter le NINA
     nodes.append('text')
-      .attr('dy', '15') // Ajusté
+      .attr('dy', '15')
       .attr('text-anchor', 'middle')
       .attr('class', 'node-nina')
-      .text((d: any) => `NINA: ${d.nina}`)
+      .text((d: PositionedTreeNode) => `NINA: ${d.nina}`)
       .style('font-size', '11px')
       .style('fill', '#1976d2');
 
     // Ajouter les relations avec un style plus visible
     nodes.append('text')
-      .attr('dy', '35') // Ajusté
+      .attr('dy', '35')
       .attr('text-anchor', 'middle')
       .attr('class', 'node-relation')
-      .text((d: any) => d.relation !== 'principal' ? d.relation : '')
+      .text((d: PositionedTreeNode) => d.relation !== 'principal' ? d.relation : '')
       .style('font-size', '10px')
       .style('font-style', 'italic')
       .style('fill', '#555');

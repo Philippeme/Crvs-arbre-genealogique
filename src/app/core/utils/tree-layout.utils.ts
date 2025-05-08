@@ -1,6 +1,12 @@
 import * as d3 from 'd3';
 import { TreeData, TreeNode } from '../models/arbre-genealogique.model';
 
+// Interface pour les nœuds avec position
+interface PositionedTreeNode extends TreeNode {
+    x: number;
+    y: number;
+}
+
 export class TreeLayoutUtils {
     /**
      * Crée une disposition hiérarchique pour un arbre généalogique
@@ -69,9 +75,9 @@ export class TreeLayoutUtils {
 
     /**
      * Crée une disposition par génération pour un arbre généalogique
-     * Optimisé pour afficher les trois générations complètes
+     * Garantit l'affichage complet de tous les nœuds
      */
-    static createGenerationalLayout(treeData: TreeData, width: number, height: number) {
+    static createGenerationalLayout(treeData: TreeData, width: number, height: number): { nodes: PositionedTreeNode[], links: { source: string, target: string, type: string }[] } {
         // Grouper les nœuds par génération
         const nodesByGeneration = new Map<number, TreeNode[]>();
 
@@ -86,49 +92,98 @@ export class TreeLayoutUtils {
         const generations = Array.from(nodesByGeneration.keys()).sort();
         const maxGeneration = Math.max(...generations);
 
-        // Vérifier si nous avons bien 3 générations (0, 1, 2, 3)
-        if (maxGeneration < 3) {
-            console.warn('L\'arbre ne contient pas 3 générations complètes');
-        }
-
         // Répartir verticalement les générations
-        // Avec plus d'espace pour les générations supérieures qui ont plus de personnes
-        const totalHeight = height * 0.85;
+        const totalHeight = height * 0.9;
 
-        // Espacement vertical entre les générations, calculé pour maximiser l'utilisation de l'espace
+        // Espacement vertical entre les générations
         const verticalSpacing = totalHeight / (maxGeneration + 1);
 
-        // Répartir les nœuds de chaque génération horizontalement
-        const nodesWithPositions = treeData.nodes.map(node => {
-            const nodesInGen = nodesByGeneration.get(node.generation) || [];
-            const nodeIndex = nodesInGen.findIndex(n => n.id === node.id);
-            const totalNodesInGen = nodesInGen.length;
+        // Positions verticales pour chaque génération (du bas vers le haut)
+        const verticalPositions = new Map<number, number>();
+        generations.forEach(gen => {
+            // Position verticale pour cette génération
+            verticalPositions.set(gen, height - (verticalSpacing * (gen + 0.5)));
+        });
 
-            // Calculer l'espace horizontal disponible
-            const horizontalPadding = width * 0.1; // 10% de marge de chaque côté
-            const usableWidth = width - (2 * horizontalPadding);
+        // Résultats pour les nœuds positionnés
+        const positionedNodes: PositionedTreeNode[] = [];
 
-            // Calculer l'espacement horizontal de manière dynamique, en fonction du nombre de nœuds
-            // mais avec un minimum pour éviter le chevauchement
-            const minSpacing = 200; // Espacement minimum entre les nœuds
-            const totalSpacingNeeded = minSpacing * (totalNodesInGen - 1);
-            const widthPerNode = Math.max(usableWidth / totalNodesInGen, minSpacing);
+        // Traiter chaque génération
+        generations.forEach(generation => {
+            const nodesInGen = nodesByGeneration.get(generation) || [];
+            const count = nodesInGen.length;
 
-            // Calculer la position horizontale en fonction de l'index
-            const x = horizontalPadding + (widthPerNode * nodeIndex) + (widthPerNode / 2);
+            if (count === 0) return;
 
-            // Calculer la position verticale inversée (génération 0 en bas, 3 en haut)
-            const y = height - (verticalSpacing * (node.generation + 0.5));
+            // Position verticale pour cette génération
+            const y = verticalPositions.get(generation) || 0;
 
-            return {
-                ...node,
-                x,
-                y
-            };
+            // Trier les nœuds par relation pour un meilleur arrangement
+            const sortedNodes = [...nodesInGen].sort((a, b) => {
+                // La personne principale est toujours au centre
+                if (a.relation === 'principal') return -1;
+                if (b.relation === 'principal') return 1;
+
+                // Grouper par côté paternel/maternel
+                const aPaternel = a.relation.includes('pere') || a.relation.includes('paternel');
+                const bPaternel = b.relation.includes('pere') || b.relation.includes('paternel');
+
+                if (aPaternel && !bPaternel) return -1;
+                if (!aPaternel && bPaternel) return 1;
+
+                return a.relation.localeCompare(b.relation);
+            });
+
+            // Utilisation de toute la largeur disponible
+            const usableWidth = width * 0.9;
+            const nodeSpacing = usableWidth / (count + 1);
+
+            // Distribuer les nœuds horizontalement
+            sortedNodes.forEach((node, index) => {
+                // Position horizontale calculée
+                let x = nodeSpacing * (index + 1);
+
+                // Ajustement spécial pour les arbres avec peu de nœuds par génération
+                if (count <= 2 && node.relation === 'principal') {
+                    x = width / 2; // Centrer la personne principale
+                }
+
+                // Ajout aux résultats
+                positionedNodes.push({
+                    ...node,
+                    x,
+                    y
+                });
+            });
+        });
+
+        // Vérifier si tous les nœuds sont inclus
+        const allNodeIds = new Set(treeData.nodes.map(n => n.id));
+        const positionedIds = new Set(positionedNodes.map(n => n.id));
+
+        // Ajouter les nœuds manquants avec une position par défaut
+        treeData.nodes.forEach(node => {
+            if (!positionedIds.has(node.id)) {
+                const y = verticalPositions.get(node.generation) || (height / 2);
+                let x = width / 2; // Position par défaut au centre
+
+                // Ajustement selon la relation
+                if (node.relation.includes('pere') || node.relation.includes('paternel')) {
+                    x = width * 0.25; // Côté gauche
+                } else if (node.relation.includes('mere') || node.relation.includes('maternel')) {
+                    x = width * 0.75; // Côté droit
+                }
+
+                positionedNodes.push({
+                    ...node,
+                    x,
+                    y
+                });
+            }
         });
 
         return {
-            nodes: nodesWithPositions,
+            nodes: positionedNodes,
             links: treeData.links
         };
     }
