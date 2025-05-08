@@ -468,6 +468,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
     const linkKeys = new Set<string>();
 
     // Dessiner les liens avec des courbes optimisées pour éviter les croisements
+    // Utiliser le même style que pour la vue hiérarchique
     this.treeData.links.forEach(link => {
       // Utiliser le type correct pour source et target
       const source = nodesById.get(link.source);
@@ -488,6 +489,9 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       let strokeWidth = 2;
       let strokeDasharray = null;
 
+      // Déterminer si l'un des nœuds est la personne principale
+      const isMainPersonInvolved = source.relation === 'principal' || target.relation === 'principal';
+
       // Attribuer un type de lien et des styles en fonction de la relation
       if (source.relation.includes('pere') || target.relation.includes('pere') ||
         source.relation.includes('paternel') || target.relation.includes('paternel')) {
@@ -502,81 +506,39 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       }
 
       // Accentuer le lien avec la personne principale
-      if (source.relation === 'principal' || target.relation === 'principal') {
+      if (isMainPersonInvolved) {
         strokeWidth = 3;
-        strokeDasharray = null;
-      }
-
-      // Calculer le décalage horizontal et vertical entre les nœuds
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Ajustement des courbes pour éviter les croisements
-      // Importante amélioration: calculer les points de contrôle avec plus de précision
-      let controlPoint1X, controlPoint1Y, controlPoint2X, controlPoint2Y;
-
-      // Calculer un décalage horizontal proportionnel à la distance entre les nœuds
-      // Plus les nœuds sont éloignés, plus la courbe est prononcée
-      const horizontalOffset = Math.min(Math.abs(dx) * 0.4, 150);
-      const verticalOffset = Math.min(Math.abs(dy) * 0.3, 80);
-
-      // Vérifier si c'est un lien parent-enfant ou entre générations différentes
-      const isDescendingLink = source.generation < target.generation;
-      const isAscendingLink = source.generation > target.generation;
-
-      if (isDescendingLink) {
-        // Liens descendants (de haut en bas)
-        // Courbes différentes selon le côté (paternal/maternal)
         if (linkType === 'paternal-link') {
-          // Les liens paternels s'incurvent vers la gauche
-          controlPoint1X = source.x - horizontalOffset * 0.3;
-          controlPoint1Y = source.y + verticalOffset;
-          controlPoint2X = target.x - horizontalOffset * 0.7;
-          controlPoint2Y = target.y - verticalOffset;
+          linkColor = '#1976d2'; // Bleu plus foncé pour la personne principale
         } else if (linkType === 'maternal-link') {
-          // Les liens maternels s'incurvent vers la droite
-          controlPoint1X = source.x + horizontalOffset * 0.3;
-          controlPoint1Y = source.y + verticalOffset;
-          controlPoint2X = target.x + horizontalOffset * 0.7;
-          controlPoint2Y = target.y - verticalOffset;
+          linkColor = '#c2185b'; // Rose plus foncé pour la personne principale
         } else {
-          // Liens neutres
-          controlPoint1X = source.x;
-          controlPoint1Y = source.y + verticalOffset;
-          controlPoint2X = target.x;
-          controlPoint2Y = target.y - verticalOffset;
+          linkColor = '#4caf50'; // Vert pour les autres liens avec la personne principale
         }
-      } else if (isAscendingLink) {
-        // Liens ascendants (de bas en haut)
-        if (target.x < source.x) {
-          // Quand la cible est à gauche de la source
-          controlPoint1X = source.x - horizontalOffset;
-          controlPoint1Y = source.y - verticalOffset * 0.7;
-          controlPoint2X = target.x + horizontalOffset * 0.5;
-          controlPoint2Y = target.y + verticalOffset * 1.3;
-        } else {
-          // Quand la cible est à droite de la source
-          controlPoint1X = source.x + horizontalOffset;
-          controlPoint1Y = source.y - verticalOffset * 0.7;
-          controlPoint2X = target.x - horizontalOffset * 0.5;
-          controlPoint2Y = target.y + verticalOffset * 1.3;
-        }
-      } else {
-        // Liens entre nœuds de même génération (rare)
-        controlPoint1X = source.x;
-        controlPoint1Y = source.y + distance * 0.2;
-        controlPoint2X = target.x;
-        controlPoint2Y = target.y - distance * 0.2;
       }
 
-      // Dessiner le lien avec des courbes de Bézier
+      // Utiliser le même style de lien que dans la vue hiérarchique
+      // avec des courbes plus douces et directes
+      const diagonal = d3.linkHorizontal<any, any>()
+        .x((d: any) => d.y)
+        .y((d: any) => d.x);
+
+      // Adapter les données pour le format attendu par d3.linkHorizontal
+      const linkData = {
+        source: {
+          x: source.y, // Inverser x et y pour linkHorizontal (qui travaille horizontalement)
+          y: source.x
+        },
+        target: {
+          x: target.y,
+          y: target.x
+        }
+      };
+
+      // Dessiner le lien avec la courbe d3.linkHorizontal
       linksGroup.append('path')
-        .attr('class', `tree-link ${linkType}`)
-        .attr('d', `M${source.x},${source.y} 
-                C${controlPoint1X},${controlPoint1Y} 
-                  ${controlPoint2X},${controlPoint2Y} 
-                  ${target.x},${target.y}`)
+        .attr('class', `tree-link ${linkType} ${isMainPersonInvolved ? 'principal-link' : ''}`)
+        .attr('d', diagonal(linkData))
         .style('stroke', linkColor)
         .style('stroke-width', strokeWidth)
         .style('stroke-dasharray', strokeDasharray)
@@ -654,6 +616,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       });
 
     // Ajouter des rectangles aux nœuds avec les couleurs selon le genre
+    // Harmoniser le style avec la vue hiérarchique
     nodes.append('rect')
       .attr('x', -90)
       .attr('y', -45)
@@ -662,7 +625,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
       .attr('rx', 8)
       .attr('ry', 8)
       .attr('fill', (d: PositionedTreeNode) => {
-        // Couleurs basées sur le genre et la relation
+        // Couleurs basées sur le genre et la relation, harmonisées avec la vue hiérarchique
         if (d.relation === 'principal') {
           return '#e8f5e9'; // Vert pâle pour la personne principale
         } else {
@@ -670,7 +633,7 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
         }
       })
       .style('stroke', (d: PositionedTreeNode) => {
-        // Couleur de bordure basée sur le genre
+        // Couleur de bordure basée sur le genre, harmonisée avec la vue hiérarchique
         if (d.relation === 'principal') {
           return '#4caf50'; // Vert pour la personne principale
         } else {
@@ -678,11 +641,11 @@ export class ArbreGenealogiqueComponent implements OnInit, AfterViewInit, OnDest
         }
       })
       .style('stroke-width', (d: PositionedTreeNode) => {
-        // Bordure plus épaisse pour la personne principale
+        // Bordure plus épaisse pour la personne principale, harmonisée avec la vue hiérarchique
         return d.relation === 'principal' ? 3 : 1.5;
       })
       .style('filter', (d: PositionedTreeNode) => {
-        // Ombre portée plus marquée pour la personne principale
+        // Ombre portée plus marquée pour la personne principale, harmonisée avec la vue hiérarchique
         return d.relation === 'principal'
           ? 'drop-shadow(0 2px 5px rgba(0,0,0,0.2))'
           : 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))';

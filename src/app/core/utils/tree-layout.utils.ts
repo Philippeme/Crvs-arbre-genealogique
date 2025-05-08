@@ -219,34 +219,61 @@ export class TreeLayoutUtils {
             const greatGrandparents = nodesByGeneration.get(3) || [];
             const gen3Y = verticalPositions.get(3) || height * 0.1;
 
-            // Diviser la largeur disponible en 8 sections pour les arrière-grands-parents
-            const sectionWidth = width / 8;
+            // Espacement de la génération 2
+            const gen2Spacing = quarterWidth;
+            // L'espacement de la génération 3 doit être la moitié de celui de la génération 2
+            const gen3Spacing = gen2Spacing / 2;
 
-            // Groupe 1: Arrière-grands-parents paternels côté paternel
-            const pgpf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-paternel'));
-            const pgpm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-paternelle-paternelle'));
+            // Calculer le nombre total de positions nécessaires pour la génération 3
+            const totalGreatGrandparents = greatGrandparents.length;
+            // S'assurer qu'il y a au moins 8 espaces même si tous ne sont pas utilisés
+            const minPositions = 8;
+            const numPositions = Math.max(totalGreatGrandparents, minPositions);
 
-            // Groupe 2: Arrière-grands-parents maternels côté paternel
-            const pgmf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-paternel-maternel'));
-            const pgmm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-paternelle-maternelle'));
+            // Diviser la largeur totale par le nombre de positions pour obtenir un espacement égal
+            const sectionWidth = width / numPositions;
 
-            // Groupe 3: Arrière-grands-parents paternels côté maternel
-            const mgpf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-maternel-paternel'));
-            const mgpm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-maternelle-paternelle'));
+            // Grouper les arrière-grands-parents par relation avec leurs grands-parents
+            // Branche paternelle-paternelle (côté père du père)
+            const ppBranch = greatGrandparents.filter(n =>
+                n.relation.includes('arriere-grand-pere-paternel-paternel') ||
+                n.relation.includes('arriere-grand-mere-paternelle-paternelle'));
 
-            // Groupe 4: Arrière-grands-parents maternels côté maternel
-            const mgmf = greatGrandparents.find(n => n.relation.includes('arriere-grand-pere-maternel-maternel'));
-            const mgmm = greatGrandparents.find(n => n.relation.includes('arriere-grand-mere-maternelle-maternelle'));
+            // Branche paternelle-maternelle (côté mère du père)
+            const pmBranch = greatGrandparents.filter(n =>
+                n.relation.includes('arriere-grand-pere-paternel-maternel') ||
+                n.relation.includes('arriere-grand-mere-paternelle-maternelle'));
 
-            // Positionner chaque groupe avec un espacement égal
-            if (pgpf) nodePositions.set(pgpf.id, { x: sectionWidth * 0.5, y: gen3Y });
-            if (pgpm) nodePositions.set(pgpm.id, { x: sectionWidth * 1.5, y: gen3Y });
-            if (pgmf) nodePositions.set(pgmf.id, { x: sectionWidth * 2.5, y: gen3Y });
-            if (pgmm) nodePositions.set(pgmm.id, { x: sectionWidth * 3.5, y: gen3Y });
-            if (mgpf) nodePositions.set(mgpf.id, { x: sectionWidth * 4.5, y: gen3Y });
-            if (mgpm) nodePositions.set(mgpm.id, { x: sectionWidth * 5.5, y: gen3Y });
-            if (mgmf) nodePositions.set(mgmf.id, { x: sectionWidth * 6.5, y: gen3Y });
-            if (mgmm) nodePositions.set(mgmm.id, { x: sectionWidth * 7.5, y: gen3Y });
+            // Branche maternelle-paternelle (côté père de la mère)
+            const mpBranch = greatGrandparents.filter(n =>
+                n.relation.includes('arriere-grand-pere-maternel-paternel') ||
+                n.relation.includes('arriere-grand-mere-maternelle-paternelle'));
+
+            // Branche maternelle-maternelle (côté mère de la mère)
+            const mmBranch = greatGrandparents.filter(n =>
+                n.relation.includes('arriere-grand-pere-maternel-maternel') ||
+                n.relation.includes('arriere-grand-mere-maternelle-maternelle'));
+
+            // Placer chaque branche dans sa section avec un espacement équidistant
+            const placeBranch = (branch: TreeNode[], startPos: number, numPositions: number) => {
+                if (branch.length === 0) return;
+
+                // Calculer l'espacement entre les nœuds de cette branche
+                const branchSpacing = gen3Spacing;
+
+                // Placer les nœuds avec un espacement égal
+                branch.forEach((node, i) => {
+                    // Position horizontale basée sur l'indice dans la branche
+                    const x = startPos + (i * branchSpacing);
+                    nodePositions.set(node.id, { x, y: gen3Y });
+                });
+            };
+
+            // Placer les 4 branches avec leurs positions de départ respectives
+            placeBranch(ppBranch, sectionWidth * 0.5, 2);
+            placeBranch(pmBranch, sectionWidth * 2.5, 2);
+            placeBranch(mpBranch, sectionWidth * 4.5, 2);
+            placeBranch(mmBranch, sectionWidth * 6.5, 2);
 
             // Pour les nœuds qui n'auraient pas de position calculée (cas rares)
             // Attribuer une position par défaut basée sur leur relation

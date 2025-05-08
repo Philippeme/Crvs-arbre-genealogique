@@ -141,6 +141,7 @@
     flex: 1;
     position: relative;
     overflow: hidden;
+    /* Fond amélioré avec un quadrillage plus subtil */
     background-color: #f9f9f9;
     background-image: linear-gradient(rgba(200, 200, 200, 0.1) 1px,
             transparent 1px),
@@ -214,25 +215,30 @@
             /* Styles spécifiques pour la structure avec branches séparées */
             .tree-link {
                 fill: none;
-                stroke-width: 1.5px;
+                stroke-width: 2px;
                 stroke-opacity: 0.8;
-                transition: stroke 0.3s, stroke-opacity 0.3s;
+                transition: stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s;
 
                 &:hover {
                     stroke-opacity: 1;
+                    stroke-width: 3px;
                 }
 
-                /* Styles différents pour les types de liens pour éviter visuellemnt les entre-coupages */
+                /* Styles différents pour les types de liens */
                 &.paternal-link {
                     stroke: #2196f3;
                     /* Bleu pour les liens paternels */
-                    stroke-dasharray: none;
                 }
 
                 &.maternal-link {
                     stroke: #e91e63;
                     /* Rose pour les liens maternels */
-                    stroke-dasharray: none;
+                }
+
+                /* Style spécial pour les liens avec la personne principale */
+                &.principal-link {
+                    stroke-width: 3px;
+                    animation: pulse 3s infinite;
                 }
             }
         }
@@ -240,23 +246,41 @@
         .tree-link {
             fill: none;
             stroke: #bdbdbd;
-            stroke-width: 1.5px;
+            stroke-width: 2px;
             stroke-opacity: 0.7;
-            transition: stroke 0.3s, stroke-opacity 0.3s;
+            transition: stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s;
 
             &:hover {
                 stroke: #757575;
                 stroke-opacity: 1;
+                stroke-width: 3px;
+            }
+
+            /* Styles harmonisés entre les deux vues */
+            &.paternal-link {
+                stroke: #2196f3;
+                stroke-width: 2.5px;
+            }
+
+            &.maternal-link {
+                stroke: #e91e63;
+                stroke-width: 2.5px;
+            }
+
+            &.principal-link {
+                stroke-width: 3px;
+                animation: pulse 3s infinite;
             }
         }
 
         .tree-node {
             cursor: pointer;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, filter 0.3s ease;
 
             &:hover {
                 transform: scale(1.05);
                 z-index: 10;
+                filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.2));
             }
 
             rect,
@@ -267,13 +291,14 @@
             rect {
                 fill: white;
                 stroke: #e0e0e0;
-                stroke-width: 1px;
+                stroke-width: 1.5px;
             }
 
             text {
-                font-size: 12px;
                 font-family: 'Roboto', Arial, sans-serif;
                 pointer-events: none;
+                user-select: none;
+                transition: font-size 0.3s ease;
             }
 
             .node-name {
@@ -292,6 +317,7 @@
                 font-style: italic;
             }
 
+            /* Styles harmonisés pour les différents types de nœuds */
             &.male rect {
                 fill: #e3f2fd;
                 stroke: #2196f3;
@@ -305,8 +331,8 @@
             &.principal rect {
                 fill: #e8f5e9;
                 stroke: #4caf50;
-                stroke-width: 2.5px;
-                filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2));
+                stroke-width: 3px;
+                filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.2));
             }
 
             &.selected rect {
@@ -325,6 +351,10 @@
         display: flex;
         flex-direction: column;
         z-index: 10;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 8px;
+        padding: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 
         button {
             width: 36px;
@@ -515,27 +545,36 @@
     }
 }
 
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
+/* Animation pour faire pulser la bordure des nœuds sélectionnés */
 @keyframes pulseBorder {
     0% {
         stroke-opacity: 1;
+        stroke-width: 3px;
     }
 
     50% {
-        stroke-opacity: 0.5;
+        stroke-opacity: 0.6;
+        stroke-width: 4px;
     }
 
     100% {
         stroke-opacity: 1;
+        stroke-width: 3px;
+    }
+}
+
+/* Animation subtile pour les liens importants */
+@keyframes pulse {
+    0% {
+        stroke-opacity: 0.8;
+    }
+
+    50% {
+        stroke-opacity: 1;
+    }
+
+    100% {
+        stroke-opacity: 0.8;
     }
 }
 
