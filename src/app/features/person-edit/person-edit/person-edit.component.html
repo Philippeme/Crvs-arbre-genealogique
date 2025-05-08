@@ -1,0 +1,122 @@
+<div class="person-edit-container">
+    <div class="edit-header">
+        <button class="btn-back" (click)="onCancel()">
+            <i class="fas fa-arrow-left"></i> Annuler
+        </button>
+        <h1>{{ isNewPerson ? 'Ajouter une personne' : 'Modifier une personne' }}</h1>
+    </div>
+
+    <div class="loading" *ngIf="isLoading">
+        <div class="spinner"></div>
+        <p>Chargement des données...</p>
+    </div>
+
+    <div class="error-message" *ngIf="error">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+
+    <div class="relation-info" *ngIf="parentInfo">
+        <i class="fas fa-info-circle"></i>
+        <span *ngIf="parentType === 'pere'">
+            Vous ajoutez le père de <strong>{{ parentInfo.prenom }} {{ parentInfo.nom }}</strong>
+        </span>
+        <span *ngIf="parentType === 'mere'">
+            Vous ajoutez la mère de <strong>{{ parentInfo.prenom }} {{ parentInfo.nom }}</strong>
+        </span>
+    </div>
+
+    <form [formGroup]="personForm" (ngSubmit)="onSubmit()" class="person-form">
+        <div class="form-section">
+            <h3>Informations d'identification</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="nina">NINA <span class="required">*</span></label>
+                    <input type="text" id="nina" formControlName="nina" placeholder="15 chiffres">
+                    <div class="error-message" *ngIf="f['nina'].touched && f['nina'].errors">
+                        <span *ngIf="f['nina'].errors['required']">Le NINA est obligatoire</span>
+                        <span *ngIf="f['nina'].errors['pattern']">Le NINA doit contenir exactement 15 chiffres</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nom">Nom <span class="required">*</span></label>
+                    <input type="text" id="nom" formControlName="nom" placeholder="Nom de famille">
+                    <div class="error-message" *ngIf="f['nom'].touched && f['nom'].errors?.['required']">
+                        Le nom est obligatoire
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="prenom">Prénom <span class="required">*</span></label>
+                    <input type="text" id="prenom" formControlName="prenom" placeholder="Prénom">
+                    <div class="error-message" *ngIf="f['prenom'].touched && f['prenom'].errors?.['required']">
+                        Le prénom est obligatoire
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="genre">Genre <span class="required">*</span></label>
+                    <select id="genre" formControlName="genre">
+                        <option value="M">Masculin</option>
+                        <option value="F">Féminin</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Informations de naissance</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="dateNaissance">Date de naissance</label>
+                    <input type="date" id="dateNaissance" formControlName="dateNaissance">
+                </div>
+
+                <div class="form-group">
+                    <label for="lieuNaissance">Lieu de naissance</label>
+                    <input type="text" id="lieuNaissance" formControlName="lieuNaissance" placeholder="Ville, Région">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Informations des parents</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="nomPere">Nom du père</label>
+                    <input type="text" id="nomPere" formControlName="nomPere" placeholder="Nom du père">
+                </div>
+
+                <div class="form-group">
+                    <label for="ninaPere">NINA du père</label>
+                    <input type="text" id="ninaPere" formControlName="ninaPere" placeholder="15 chiffres">
+                    <div class="error-message" *ngIf="f['ninaPere'].touched && f['ninaPere'].errors?.['pattern']">
+                        Le NINA doit contenir exactement 15 chiffres
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nomMere">Nom de la mère</label>
+                    <input type="text" id="nomMere" formControlName="nomMere" placeholder="Nom de la mère">
+                </div>
+
+                <div class="form-group">
+                    <label for="ninaMere">NINA de la mère</label>
+                    <input type="text" id="ninaMere" formControlName="ninaMere" placeholder="15 chiffres">
+                    <div class="error-message" *ngIf="f['ninaMere'].touched && f['ninaMere'].errors?.['pattern']">
+                        Le NINA doit contenir exactement 15 chiffres
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn-cancel" (click)="onCancel()">Annuler</button>
+            <button type="submit" class="btn-save" [disabled]="isSaving">
+                <div *ngIf="isSaving" class="spinner-small"></div>
+                <span *ngIf="!isSaving">{{ isNewPerson ? 'Créer' : 'Enregistrer les modifications' }}</span>
+                <span *ngIf="isSaving">Enregistrement...</span>
+            </button>
+        </div>
+    </form>
+</div>

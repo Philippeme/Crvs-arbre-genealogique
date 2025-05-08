@@ -1,0 +1,32 @@
+<div class="app-container">
+  <header class="app-header">
+    <div class="header-content">
+      <div class="logo-container">
+        <img src="assets/images/images (1).jpg" alt="Logo République du Mali" class="logo">
+        <div class="app-title">
+          <h1>CRVS État du Mali</h1>
+          <p>Module d'Arbre Généalogique</p>
+        </div>
+      </div>
+      <nav class="main-nav">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+          <i class="fas fa-home"></i> Accueil
+        </a>
+        <a routerLink="/search" routerLinkActive="active">
+          <i class="fas fa-search"></i> Recherche
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app-content">
+    <router-outlet></router-outlet>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p>&copy; 2025 République du Mali - CRVS État Civil</p>
+      <p>Version 1.0.0</p>
+    </div>
+  </footer>
+</div>

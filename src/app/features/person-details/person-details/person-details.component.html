@@ -1,0 +1,103 @@
+<!-- src/app/features/person-details/person-details/person-details.component.html -->
+<div class="person-details-container">
+    <div class="details-header">
+        <button class="btn-back" (click)="onGoBack()">
+            <i class="fas fa-arrow-left"></i> Retour
+        </button>
+        <h1>Détails de la personne</h1>
+    </div>
+
+    <div class="loading" *ngIf="isLoading">
+        <div class="spinner"></div>
+        <p>Chargement des détails...</p>
+    </div>
+
+    <div class="error-message" *ngIf="error">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+
+    <div class="details-content" *ngIf="personne$ | async as personne">
+        <div class="person-header" [ngClass]="{'male': personne.genre === 'M', 'female': personne.genre === 'F'}">
+            <div class="person-icon">
+                <i class="fas" [ngClass]="{'fa-male': personne.genre === 'M', 'fa-female': personne.genre === 'F'}"></i>
+            </div>
+            <div class="person-name">
+                <h2>{{ personne.nom }} {{ personne.prenom }}</h2>
+                <p class="nina">NINA: {{ personne.nina | ninaFormat }}</p>
+            </div>
+        </div>
+
+        <div class="details-section">
+            <h3>Informations personnelles</h3>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <label>Nom</label>
+                    <p>{{ personne.nom }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Prénom</label>
+                    <p>{{ personne.prenom }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Genre</label>
+                    <p>{{ personne.genre === 'M' ? 'Masculin' : 'Féminin' }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Date de naissance</label>
+                    <p *ngIf="personne.dateNaissance">{{ personne.dateNaissance | date:'dd/MM/yyyy' }}</p>
+                    <p *ngIf="!personne.dateNaissance">Non spécifiée</p>
+                </div>
+                <div class="detail-item">
+                    <label>Lieu de naissance</label>
+                    <p>{{ personne.lieuNaissance || 'Non spécifié' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="details-section">
+            <h3>Liens familiaux</h3>
+            <div class="family-links">
+                <div class="parent-info">
+                    <h4>Père</h4>
+                    <div *ngIf="pere$ | async as pere" class="parent-card">
+                        <app-person-card [personne]="pere" [showActions]="false" (selected)="onViewArbre(pere)">
+                        </app-person-card>
+                    </div>
+                    <div *ngIf="personne.nomPere && !(pere$ | async)" class="parent-info-basic">
+                        <p><strong>Nom:</strong> {{ personne.nomPere }}</p>
+                        <p *ngIf="personne.ninaPere"><strong>NINA:</strong> {{ personne.ninaPere | ninaFormat }}</p>
+                        <p *ngIf="!personne.ninaPere" class="missing-info">NINA non disponible</p>
+                    </div>
+                    <div *ngIf="!personne.nomPere && !personne.ninaPere" class="missing-parent">
+                        Information sur le père non disponible
+                    </div>
+                </div>
+
+                <div class="parent-info">
+                    <h4>Mère</h4>
+                    <div *ngIf="mere$ | async as mere" class="parent-card">
+                        <app-person-card [personne]="mere" [showActions]="false" (selected)="onViewArbre(mere)">
+                        </app-person-card>
+                    </div>
+                    <div *ngIf="personne.nomMere && !(mere$ | async)" class="parent-info-basic">
+                        <p><strong>Nom:</strong> {{ personne.nomMere }}</p>
+                        <p *ngIf="personne.ninaMere"><strong>NINA:</strong> {{ personne.ninaMere | ninaFormat }}</p>
+                        <p *ngIf="!personne.ninaMere" class="missing-info">NINA non disponible</p>
+                    </div>
+                    <div *ngIf="!personne.nomMere && !personne.ninaMere" class="missing-parent">
+                        Information sur la mère non disponible
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="details-actions">
+            <button class="btn-edit" (click)="onEdit(personne)">
+                <i class="fas fa-edit"></i> Modifier
+            </button>
+            <button class="btn-view-tree" (click)="onViewArbre(personne)">
+                <i class="fas fa-sitemap"></i> Voir l'arbre généalogique
+            </button>
+        </div>
+    </div>
+</div>

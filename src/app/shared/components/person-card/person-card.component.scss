@@ -1,0 +1,110 @@
+.person-card {
+    display: flex;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+    background-color: #fff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    &.selected {
+        border: 2px solid #4caf50;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+    }
+
+    &.main-person {
+        background-color: #e8f5e9;
+        border-left: 5px solid #4caf50;
+    }
+}
+
+.person-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+
+    &.male {
+        background-color: #e3f2fd;
+        color: #2196f3;
+    }
+
+    &.female {
+        background-color: #fce4ec;
+        color: #e91e63;
+    }
+
+    i {
+        font-size: 28px;
+    }
+}
+
+.person-info {
+    flex: 1;
+
+    h3 {
+        margin: 0 0 5px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    p {
+        margin: 3px 0;
+        color: #616161;
+        font-size: 14px;
+
+        &.nina {
+            font-weight: 500;
+            color: #1976d2;
+        }
+    }
+}
+
+.person-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+
+    button {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background-color: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        i {
+            font-size: 16px;
+        }
+
+        &.btn-details {
+            color: #673ab7;
+        }
+
+        &.btn-edit {
+            color: #2196f3;
+        }
+
+        &.btn-delete {
+            color: #f44336;
+        }
+    }
+}

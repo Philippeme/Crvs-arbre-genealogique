@@ -1,0 +1,50 @@
+[
+    {
+        "id": "1",
+        "nina": "123456789012345",
+        "nom": "Keita",
+        "prenom": "Amadou",
+        "genre": "M",
+        "dateNaissance": "2000-06-15",
+        "lieuNaissance": "Bamako",
+        "nomPere": "Keita",
+        "prenom": "Ibrahim",
+        "nomMere": "Coulibaly",
+        "ninaPere": "123456789054321",
+        "ninaMere": "123456789098765",
+        "generation": 0,
+        "relationTypeAvecPrincipal": "principal"
+    },
+    {
+        "id": "2",
+        "nina": "123456789054321",
+        "nom": "Keita",
+        "prenom": "Ibrahim",
+        "genre": "M",
+        "dateNaissance": "1970-04-10",
+        "lieuNaissance": "Sikasso",
+        "nomPere": "Keita",
+        "prenom": "Moussa",
+        "nomMere": "Diallo",
+        "ninaPere": "123456789011111",
+        "ninaMere": "123456789022222",
+        "generation": 1,
+        "relationTypeAvecPrincipal": "pere"
+    },
+    {
+        "id": "3",
+        "nina": "123456789098765",
+        "nom": "Coulibaly",
+        "prenom": "Fatoumata",
+        "genre": "F",
+        "dateNaissance": "1975-08-22",
+        "lieuNaissance": "Kayes",
+        "nomPere": "Coulibaly",
+        "prenom": "Bakary",
+        "nomMere": "Toure",
+        "ninaPere": "123456789033333",
+        "ninaMere": "123456789044444",
+        "generation": 1,
+        "relationTypeAvecPrincipal": "mere"
+    }
+]

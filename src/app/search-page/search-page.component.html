@@ -1,0 +1,21 @@
+<div class="search-page-container">
+    <h2>Recherche de personnes</h2>
+
+    <app-person-search (searchResults)="onSearchResults($event)"></app-person-search>
+
+    <div class="search-results">
+        <h3 *ngIf="searchResults.length > 0">{{ searchResults.length }} résultat(s) trouvé(s)</h3>
+
+        <div class="no-results" *ngIf="searchResults.length === 0">
+            <i class="fas fa-info-circle"></i> Aucun résultat ne correspond à votre recherche. Essayez d'autres
+            critères.
+        </div>
+
+        <div class="results-list">
+            <app-person-card *ngFor="let personne of searchResults" [personne]="personne"
+                (detailsClicked)="onPersonDetails($event)" (editClicked)="onEditPerson($event)"
+                (deleteClicked)="onDeletePerson($event)" (selected)="onViewArbre($event)">
+            </app-person-card>
+        </div>
+    </div>
+</div>

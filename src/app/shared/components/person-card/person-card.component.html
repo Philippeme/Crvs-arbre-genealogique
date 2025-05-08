@@ -1,0 +1,29 @@
+<div class="person-card" [class.selected]="isSelected" [class.main-person]="isMain" (click)="onSelect()">
+    <div class="person-icon" [ngClass]="{'male': personne.genre === 'M', 'female': personne.genre === 'F'}">
+        <i class="fas" [ngClass]="{'fa-male': personne.genre === 'M', 'fa-female': personne.genre === 'F'}"></i>
+    </div>
+    <div class="person-info">
+        <h3>{{ personne.nom }} {{ personne.prenom }}</h3>
+        <p class="nina">NINA: {{ personne.nina }}</p>
+        <p *ngIf="personne.dateNaissance">
+            Né(e) le: {{ personne.dateNaissance | date:'dd/MM/yyyy' }}
+        </p>
+        <p *ngIf="personne.lieuNaissance">
+            à {{ personne.lieuNaissance }}
+        </p>
+        <p *ngIf="personne.relationTypeAvecPrincipal && personne.relationTypeAvecPrincipal !== 'principal'">
+            Relation: {{ personne.relationTypeAvecPrincipal | titlecase }}
+        </p>
+    </div>
+    <div class="person-actions" *ngIf="showActions">
+        <button class="btn-details" (click)="onDetails(); $event.stopPropagation()">
+            <i class="fas fa-eye"></i>
+        </button>
+        <button class="btn-edit" (click)="onEdit(); $event.stopPropagation()">
+            <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn-delete" (click)="onDelete(); $event.stopPropagation()">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>

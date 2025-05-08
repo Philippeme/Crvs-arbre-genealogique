@@ -1,0 +1,43 @@
+<div class="search-container">
+    <h2>Recherche de personnes</h2>
+
+    <form [formGroup]="searchForm">
+        <div class="search-fields">
+            <div class="form-group">
+                <label for="nina">NINA</label>
+                <input type="text" id="nina" formControlName="nina" placeholder="Ex: 123456789012345">
+            </div>
+
+            <div class="form-group">
+                <label for="nom">Nom</label>
+                <input type="text" id="nom" formControlName="nom" placeholder="Nom de famille">
+            </div>
+
+            <div class="form-group">
+                <label for="prenom">Prénom</label>
+                <input type="text" id="prenom" formControlName="prenom" placeholder="Prénom">
+            </div>
+
+            <div class="form-group">
+                <label for="nomPere">Nom du père</label>
+                <input type="text" id="nomPere" formControlName="nomPere" placeholder="Nom du père">
+            </div>
+
+            <div class="form-group">
+                <label for="nomMere">Nom de la mère</label>
+                <input type="text" id="nomMere" formControlName="nomMere" placeholder="Nom de la mère">
+            </div>
+        </div>
+
+        <div class="search-actions">
+            <button type="button" class="btn-reset" (click)="resetSearch()">
+                <i class="fas fa-times"></i> Réinitialiser
+            </button>
+        </div>
+    </form>
+
+    <div *ngIf="isLoading" class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Recherche en cours...</p>
+    </div>
+</div>

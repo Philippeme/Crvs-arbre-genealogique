@@ -1,0 +1,11 @@
+<div [ngClass]="nodeClass" [style.left.px]="node.x" [style.top.px]="node.y" (click)="onClick()">
+    <div class="node-icon">
+        <i class="fas" [ngClass]="{'fa-male': node.genre === 'M', 'fa-female': node.genre === 'F'}"></i>
+    </div>
+    <div class="node-info">
+        <div class="node-name">{{ node.nom }} {{ node.prenom }}</div>
+        <div class="node-relation" *ngIf="node.relation !== 'principal'">
+            {{ node.relation }}
+        </div>
+    </div>
+</div>

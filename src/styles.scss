@@ -1,0 +1,306 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    font-size: 16px;
+    color: #333;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+/* Variables pour les couleurs principales */
+:root {
+    --primary-color: #4caf50;
+    --primary-dark: #388e3c;
+    --primary-light: #c8e6c9;
+    --accent-color: #2196f3;
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --divider-color: #e0e0e0;
+    --error-color: #f44336;
+    --warning-color: #ff9800;
+    --success-color: #4caf50;
+}
+
+/* Styles pour les éléments communs */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin-top: 0;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+a {
+    text-decoration: none;
+    color: var(--accent-color);
+    transition: color 0.2s;
+
+    &:hover {
+        color: #1976d2;
+    }
+}
+
+button {
+    cursor: pointer;
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Utilitaires */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}
+
+.mt-4 {
+    margin-top: 1.5rem;
+}
+
+.mt-5 {
+    margin-top: 3rem;
+}
+
+.mb-1 {
+    margin-bottom: 0.25rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.mb-4 {
+    margin-bottom: 1.5rem;
+}
+
+.mb-5 {
+    margin-bottom: 3rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Styles pour les composants communs */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+/* Classes communes pour les états de chargement, erreurs, etc. */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.error-message {
+    background-color: #ffebee;
+    color: var(--error-color);
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.success-message {
+    background-color: #e8f5e9;
+    color: var(--success-color);
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.warning-message {
+    background-color: #fff8e1;
+    color: var(--warning-color);
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+/* Styles pour les formulaires */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    }
+
+    &.ng-invalid.ng-touched {
+        border-color: var(--error-color);
+
+        &:focus {
+            box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
+        }
+    }
+}
+
+.validation-error {
+    color: var(--error-color);
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+/* Styles pour les boutons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, box-shadow 0.2s;
+
+    &.btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+
+        &:hover {
+            background-color: var(--primary-dark);
+        }
+    }
+
+    &.btn-secondary {
+        background-color: #f5f5f5;
+        color: var(--text-secondary);
+        border: 1px solid #ddd;
+
+        &:hover {
+            background-color: #e0e0e0;
+        }
+    }
+
+    &.btn-accent {
+        background-color: var(--accent-color);
+        color: white;
+
+        &:hover {
+            background-color: #1976d2;
+        }
+    }
+
+    &.btn-danger {
+        background-color: var(--error-color);
+        color: white;
+
+        &:hover {
+            background-color: #d32f2f;
+        }
+    }
+
+    &:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .btn-icon {
+        margin-right: 6px;
+    }
+}
+
+/* Media queries */
+@media (max-width: 992px) {
+    .container {
+        padding: 0 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    html {
+        font-size: 14px;
+    }
+
+    .container {
+        padding: 0 10px;
+    }
+}

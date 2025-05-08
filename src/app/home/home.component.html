@@ -1,0 +1,86 @@
+<div class="home-container">
+    <div class="welcome-section">
+        <div class="welcome-content">
+            <h2>Bienvenue sur le module d'Arbre Généalogique</h2>
+            <p>Ce module vous permet de consulter, créer et gérer des arbres généalogiques pour l'établissement des
+                actes de naissance au Mali.</p>
+            <div class="welcome-actions">
+                <button class="btn-create" (click)="createNewPerson()">
+                    <i class="fas fa-plus"></i> Créer une nouvelle personne
+                </button>
+                <button class="btn-search" routerLink="/search">
+                    <i class="fas fa-search"></i> Rechercher une personne
+                </button>
+            </div>
+        </div>
+        <div class="welcome-image">
+            <!-- Image représentative -->
+            <i class="fas fa-sitemap tree-icon"></i>
+        </div>
+    </div>
+
+    <div class="recent-section">
+        <h3>Personnes récentes</h3>
+
+        <div class="loading" *ngIf="isLoading">
+            <div class="spinner"></div>
+            <p>Chargement des personnes récentes...</p>
+        </div>
+
+        <div class="error-message" *ngIf="error">
+            <i class="fas fa-exclamation-circle"></i> {{ error }}
+        </div>
+
+        <div class="no-results" *ngIf="!isLoading && recentPersonnes.length === 0 && !error">
+            <i class="fas fa-info-circle"></i> Aucune personne n'a été créée pour le moment.
+        </div>
+
+        <div class="recent-list">
+            <app-person-card *ngFor="let personne of recentPersonnes" [personne]="personne"
+                (detailsClicked)="onPersonDetails($event)" (editClicked)="onEditPerson($event)"
+                (deleteClicked)="onDeletePerson($event)" (selected)="onViewArbre($event)">
+            </app-person-card>
+        </div>
+    </div>
+
+    <div class="features-section">
+        <h3>Fonctionnalités principales</h3>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h4>Gestion des personnes</h4>
+                <p>Ajoutez, modifiez et supprimez des personnes avec leurs informations d'identification nationales.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-sitemap"></i>
+                </div>
+                <h4>Visualisation d'arbres</h4>
+                <p>Visualisez les arbres généalogiques jusqu'à la troisième génération avec plusieurs modes d'affichage.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h4>Recherche avancée</h4>
+                <p>Recherchez des personnes selon différents critères comme le nom, le NINA ou les informations des
+                    parents.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-link"></i>
+                </div>
+                <h4>Liens familiaux</h4>
+                <p>Créez et gérez facilement les liens entre les membres d'une même famille pour construire l'arbre
+                    généalogique.</p>
+            </div>
+        </div>
+    </div>
+</div>
